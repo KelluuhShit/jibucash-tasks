@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "JibuCash",
-    "slug": "JibuCash",
+    "name": "JibuCash Tasks",
+    "slug": "JibuCash Tasks",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
