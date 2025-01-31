@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { db } from '../services/firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 
 const SignUpScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
@@ -20,6 +20,12 @@ const SignUpScreen = ({ navigation }) => {
     return re.test(String(email).toLowerCase());
   };
 
+  const checkEmailExists = async (email) => {
+    const q = query(collection(db, 'users'), where('email', '==', email));
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
+  };
+
   const handleSignUp = async () => {
     let valid = true;
     let errors = {};
@@ -34,6 +40,9 @@ const SignUpScreen = ({ navigation }) => {
       valid = false;
     } else if (!validateEmail(email)) {
       errors.email = 'Email is not valid';
+      valid = false;
+    } else if (await checkEmailExists(email)) {
+      errors.email = 'User already exists';
       valid = false;
     }
 
@@ -64,7 +73,17 @@ const SignUpScreen = ({ navigation }) => {
           password,
         });
         setLoading(false);
-        Alert.alert('Success', 'Account created successfully');
+        Alert.alert(
+            'Success',
+            'Account created successfully',
+            [
+              {
+                text: 'Sign In',
+                onPress: () => navigation.navigate('SignInScreen'),
+              },
+            ],
+            { cancelable: false }
+          );
       } catch (error) {
         setLoading(false);
         Alert.alert('Error', 'An error occurred while creating the account');
