@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Modal, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { db } from '../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { CommonActions } from '@react-navigation/native';
 
 const SignInScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -11,6 +12,7 @@ const SignInScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
+  const [showSuccessGif, setShowSuccessGif] = useState(false);
 
   useEffect(() => {
     const fetchUsername = async () => {
@@ -64,8 +66,16 @@ const SignInScreen = ({ navigation }) => {
         if (!querySnapshot.empty) {
           const userDoc = querySnapshot.docs[0].data();
           setUsername(userDoc.username);
-          Alert.alert('Success', 'Signed in successfully');
-          // Navigate to the main app screen
+          setShowSuccessGif(true);
+          setTimeout(() => {
+            setShowSuccessGif(false);
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'HomeScreen' }],
+              })
+            );
+          }, 2500); // Display the GIF for 2 seconds
         } else {
           Alert.alert('Error', 'Invalid email or password');
         }
@@ -112,6 +122,14 @@ const SignInScreen = ({ navigation }) => {
       <TouchableOpacity onPress={() => navigation.navigate('SignUpScreen')}>
         <Text style={styles.signUpText}>Don't have an account? Sign Up</Text>
       </TouchableOpacity>
+      <Modal visible={showSuccessGif} transparent={true} animationType="fade">
+        <View style={styles.animationContainer}>
+          <Image
+            source={require('../assets/images/successSignin.gif')}
+            style={styles.gif}
+          />
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -196,6 +214,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     marginTop: 20,
     textAlign: 'center',
+  },
+  animationContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  gif: {
+    width: 200,
+    height: 200,
   },
 });
 
