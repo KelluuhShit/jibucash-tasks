@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     borderWidth: 1,
     borderColor: '#118B50',
-    borderRadius: 5,
+    borderRadius: 2,
     backgroundColor: '#fff',
     fontFamily: 'Inter-Regular',
   },
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     borderWidth: 1,
     borderColor: '#118B50',
-    borderRadius: 5,
+    borderRadius: 2,
     backgroundColor: '#fff',
   },
   passwordInput: {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Modal, Image } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { CommonActions } from '@react-navigation/native';
@@ -22,6 +23,7 @@ const SignInScreen = ({ navigation }) => {
         if (!querySnapshot.empty) {
           const userDoc = querySnapshot.docs[0].data();
           setUsername(userDoc.username);
+          await AsyncStorage.setItem('username', userDoc.username);
         } else {
           setUsername('');
         }
@@ -166,7 +168,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     borderWidth: 1,
     borderColor: '#118B50',
-    borderRadius: 5,
+    borderRadius: 2,
     backgroundColor: '#fff',
     fontFamily: 'Inter-Regular',
   },
@@ -177,7 +179,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     borderWidth: 1,
     borderColor: '#118B50',
-    borderRadius: 5,
+    borderRadius: 2,
     backgroundColor: '#fff',
   },
   passwordInput: {
