@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-const WalletScreen = () => {
+const AffiliateScreen = () => {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>Wallet Screen</Text>
+      <Text style={styles.text}>Affiliate Screen</Text>
     </View>
   );
 };
@@ -21,4 +21,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default WalletScreen;
+export default AffiliateScreen;

@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
-const WalletScreen = () => {
+const DiscoverScreen = () => {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>Wallet Screen</Text>
+      <Text style={styles.text}>Discover Screen</Text>
     </View>
   );
 };
@@ -21,4 +21,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default WalletScreen;
+export default DiscoverScreen;

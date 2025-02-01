@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    marginTop: 20,
+    marginTop: 10,
   },
   userInfo: {
     marginLeft: 20,
@@ -219,13 +219,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#118B50',
     fontFamily: 'Inter-Regular',
-    marginBottom: 5,
   },
   expiryInfo: {
     fontSize: 10,
     color: 'red',
     fontFamily: 'Inter-Regular',
-    marginBottom: 5,
   },
   taskContainer: {
     backgroundColor: '#FBF6E9',
