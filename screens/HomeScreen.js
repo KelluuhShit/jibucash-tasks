@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '../services/firebase';
@@ -14,6 +14,19 @@ const HomeScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
   const [subscription, setSubscription] = useState('Basic');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalTasks, setModalTasks] = useState([]);
+
+  const personalQuizzesTasks = [
+    { id: '1', title: 'Social Skills', description: 'Show your ability to interact with others in different situations.', amount: 80 },
+    { id: '2', title: 'Money Management', description: 'Demonstrate how you handle finances responsibly.', amount: 85 },
+    { id: '3', title: 'Time Management', description: 'Showcase your efficiency in organizing and prioritizing tasks.', amount: 90 },
+    { id: '4', title: 'Risk-Taking Ability', description: 'Express your approach to making bold or calculated decisions.', amount: 88 },
+    { id: '5', title: 'Productivity Habits', description: 'Highlight the strategies you use to stay focused and efficient.', amount: 87 },
+    { id: '6', title: 'Emotional Intelligence', description: 'Display your awareness and management of emotions in daily life.', amount: 89 },
+    { id: '7', title: 'Decision-Making Skills', description: 'Prove your ability to analyze situations and make smart choices.', amount: 86 },
+  ];
 
   useEffect(() => {
     const generateUserId = () => {
@@ -84,12 +97,24 @@ const HomeScreen = ({ navigation }) => {
             <Icon name="cash" size={20} color="orange" />
             <Text style={styles.amountText}>KSH {item.amount}</Text>
           </View>
-          <TouchableOpacity style={styles.startButton} onPress={() => Alert.alert('Start Task', `Starting ${item.title}`)}>
+          <TouchableOpacity style={styles.startButton} onPress={() => showModal(`Starting ${item.title}`)}>
             <Text style={styles.startButtonText}>Start Task</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
+  };
+
+  const showModal = (message, tasks = []) => {
+    setModalMessage(message);
+    setModalTasks(tasks);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setModalMessage('');
+    setModalTasks([]);
   };
 
   return (
@@ -112,20 +137,20 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.selectTopic}>
           <Text style={styles.title}>Select Topic</Text>
           <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.topicSelectActions}>
-            <TouchableOpacity style={styles.topicButton} onPress={() => Alert.alert('Select Topic', 'Selecting Available')}>
+            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Available Tasks', tasks)}>
               <Icon name="checkmark-circle" size={20} color="#FBF6E9" />
               <Text style={styles.topicButtonText}>Available</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => Alert.alert('Select Topic', 'Selecting Personal Quizzes')}>
+            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Personal Quizzes', personalQuizzesTasks)}>
               <Text style={styles.topicButtonText}>Personal Quizzes</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => Alert.alert('Select Topic', 'Selecting Health & Wellness')}>
+            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Selecting Health & Wellness')}>
               <Text style={styles.topicButtonText}>Health & Wellness</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => Alert.alert('Select Topic', 'Selecting General Knowledge')}>
+            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Selecting General Knowledge')}>
               <Text style={styles.topicButtonText}>General Knowledge</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => Alert.alert('Select Topic', 'Selecting Money & Savings')}>
+            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Selecting Money & Savings')}>
               <Text style={styles.topicButtonText}>Money & Savings</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -144,6 +169,41 @@ const HomeScreen = ({ navigation }) => {
           contentContainerStyle={styles.taskList}
         />
       </View>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalText}>{modalMessage}</Text>
+            <FlatList
+              data={modalTasks}
+              renderItem={({ item }) => (
+                <View style={styles.taskContainer}>
+                  <Text style={styles.taskTitle}>{item.title}</Text>
+                  <Text style={styles.taskDescription}>{item.description}</Text>
+                  <View style={styles.taskFooter}>
+                    <View style={styles.amountContainer}>
+                      <Icon name="cash" size={20} color="orange" />
+                      <Text style={styles.amountText}>KSH {item.amount}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.startButton} onPress={() => showModal(`Starting ${item.title}`)}>
+                      <Text style={styles.startButtonText}>Start Task</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+              keyExtractor={item => item.id}
+              contentContainerStyle={styles.taskList}
+            />
+            <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -232,6 +292,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#118B50',
+    width: '100%',
   },
   taskTitle: {
     fontSize: 14,
@@ -291,6 +352,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-Regular',
     marginLeft: 5,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#FBF6E9',
+    padding: 20,
+    borderRadius: 2,
+    alignItems: 'center',
+    width: '100%',
+    maxHeight: '100%',
+  },
+  modalText: {
+    fontSize: 16,
+    color: '#118B50',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 20,
+  },
+  closeButton: {
+    backgroundColor: '#5DB996',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 2,
+    marginTop: 20,
+    width:'100%'
+  },
+  closeButtonText: {
+    color: '#FBF6E9',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    textAlign:'center',
+  },
+  taskList: {
+    width: '100%',
   },
 });
 
