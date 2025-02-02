@@ -3,30 +3,16 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView }
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '../services/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { initialTasks, personalQuizzesTasks, healthWellnessTasks, generalKnowledgeTasks, moneySavingsTasks } from '../data/tasks';
 
 const HomeScreen = ({ navigation }) => {
-  const [tasks, setTasks] = useState([
-    { id: '1', title: 'Task 1', description: 'Description for Task 1', expiry: Date.now() + 24 * 60 * 60 * 1000, amount: 9 },
-    { id: '2', title: 'Task 2', description: 'Description for Task 2', expiry: Date.now() + 24 * 60 * 60 * 1000, amount: 4 },
-    { id: '3', title: 'Task 3', description: 'Description for Task 3', expiry: Date.now() + 24 * 60 * 60 * 1000, amount: 7 },
-  ]);
+  const [tasks, setTasks] = useState(initialTasks); // Use imported initial tasks
   const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
   const [subscription, setSubscription] = useState('Basic');
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [modalTasks, setModalTasks] = useState([]);
-
-  const personalQuizzesTasks = [
-    { id: '1', title: 'Social Skills', description: 'Show your ability to interact with others in different situations.', amount: 80 },
-    { id: '2', title: 'Money Management', description: 'Demonstrate how you handle finances responsibly.', amount: 85 },
-    { id: '3', title: 'Time Management', description: 'Showcase your efficiency in organizing and prioritizing tasks.', amount: 90 },
-    { id: '4', title: 'Risk-Taking Ability', description: 'Express your approach to making bold or calculated decisions.', amount: 88 },
-    { id: '5', title: 'Productivity Habits', description: 'Highlight the strategies you use to stay focused and efficient.', amount: 87 },
-    { id: '6', title: 'Emotional Intelligence', description: 'Display your awareness and management of emotions in daily life.', amount: 89 },
-    { id: '7', title: 'Decision-Making Skills', description: 'Prove your ability to analyze situations and make smart choices.', amount: 86 },
-  ];
 
   useEffect(() => {
     const generateUserId = () => {
@@ -87,6 +73,9 @@ const HomeScreen = ({ navigation }) => {
     const minutes = Math.floor((item.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((item.timeLeft % (1000 * 60)) / 1000);
 
+    // Check if the task is part of initialTasks using the category property
+    const isInitialTask = item.category === 'initial';
+
     return (
       <View style={styles.taskContainer}>
         <Text style={styles.taskTitle}>{item.title}</Text>
@@ -97,6 +86,12 @@ const HomeScreen = ({ navigation }) => {
             <Icon name="cash" size={20} color="orange" />
             <Text style={styles.amountText}>KSH {item.amount}</Text>
           </View>
+          {!isInitialTask && (
+            <View style={styles.premiumContainer}>
+              <Icon name="diamond" size={20} color="blue" />
+              <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
+            </View>
+          )}
           <TouchableOpacity style={styles.startButton} onPress={() => showModal(`Starting ${item.title}`)}>
             <Text style={styles.startButtonText}>Start Task</Text>
           </TouchableOpacity>
@@ -144,13 +139,13 @@ const HomeScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Personal Quizzes', personalQuizzesTasks)}>
               <Text style={styles.topicButtonText}>Personal Quizzes</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Selecting Health & Wellness')}>
+            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Health & Wellness', healthWellnessTasks)}>
               <Text style={styles.topicButtonText}>Health & Wellness</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Selecting General Knowledge')}>
+            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('General Knowledge', generalKnowledgeTasks)}>
               <Text style={styles.topicButtonText}>General Knowledge</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Selecting Money & Savings')}>
+            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Money & Savings', moneySavingsTasks)}>
               <Text style={styles.topicButtonText}>Money & Savings</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -183,12 +178,19 @@ const HomeScreen = ({ navigation }) => {
               renderItem={({ item }) => (
                 <View style={styles.taskContainer}>
                   <Text style={styles.taskTitle}>{item.title}</Text>
+                  {item.category !== 'initial' && (
+                      <View style={styles.premiumContainer}>
+                        <Icon name="diamond" size={20} color="orange" />
+                        <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
+                      </View>
+                    )}
                   <Text style={styles.taskDescription}>{item.description}</Text>
                   <View style={styles.taskFooter}>
                     <View style={styles.amountContainer}>
                       <Icon name="cash" size={20} color="orange" />
                       <Text style={styles.amountText}>KSH {item.amount}</Text>
                     </View>
+                    
                     <TouchableOpacity style={styles.startButton} onPress={() => showModal(`Starting ${item.title}`)}>
                       <Text style={styles.startButtonText}>Start Task</Text>
                     </TouchableOpacity>
@@ -223,7 +225,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#FBF6E9',
     fontFamily: 'Inter-Bold',
-    },
+  },
   infoIcon: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -379,16 +381,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 2,
     marginTop: 20,
-    width:'100%'
+    width: '100%',
   },
   closeButtonText: {
     color: '#FBF6E9',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-    textAlign:'center',
+    textAlign: 'center',
   },
   taskList: {
     width: '100%',
+  },
+  premiumContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  premiumText: {
+    fontSize: 12,
+    color: 'orange',
+    fontWeight: 'bold',
+    marginLeft: 5,
   },
 });
 
