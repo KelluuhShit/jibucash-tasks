@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { db } from '../services/firebase';
 import { initialTasks, personalQuizzesTasks, healthWellnessTasks, generalKnowledgeTasks, moneySavingsTasks } from '../data/tasks';
 
@@ -13,6 +14,7 @@ const HomeScreen = ({ navigation }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [modalTasks, setModalTasks] = useState([]);
+  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
 
   useEffect(() => {
     const generateUserId = () => {
@@ -58,6 +60,24 @@ const HomeScreen = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
+    const fetchSubscription = async () => {
+      try {
+        const storedSubscription = await AsyncStorage.getItem('subscription');
+        if (storedSubscription) {
+          setSubscription(storedSubscription);
+        } else {
+          await AsyncStorage.setItem('subscription', 'Basic');
+          setSubscription('Basic');
+        }
+      } catch (error) {
+        console.error('Error fetching subscription: ', error);
+      }
+    };
+
+    fetchSubscription();
+  }, []);
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setTasks(prevTasks => prevTasks.map(task => {
         const timeLeft = task.expiry - Date.now();
@@ -67,6 +87,18 @@ const HomeScreen = ({ navigation }) => {
 
     return () => clearInterval(interval);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Reset or update state when the screen comes into focus
+      const fetchTasks = async () => {
+        // Fetch tasks or reset state here if needed
+        setTasks(initialTasks);
+      };
+
+      fetchTasks();
+    }, [])
+  );
 
   const renderItem = ({ item }) => {
     const hours = Math.floor(item.timeLeft / (1000 * 60 * 60));
@@ -92,12 +124,26 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
             </View>
           )}
-          <TouchableOpacity style={styles.startButton} onPress={() => showModal(`Starting ${item.title}`)}>
-            <Text style={styles.startButtonText}>Start Task</Text>
-          </TouchableOpacity>
+          {isInitialTask ? (
+            <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
+              <Text style={styles.startButtonText}>Start Task</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
+              <Text style={styles.subscribeButtonText}>Start Task</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
+  };
+
+  const handleStartTask = (item, isInitialTask) => {
+    if (subscription === 'Basic' && !isInitialTask) {
+      setSubscriptionModalVisible(true);
+    } else {
+      showModal(`Starting ${item.title}`);
+    }
   };
 
   const showModal = (message, tasks = []) => {
@@ -111,6 +157,23 @@ const HomeScreen = ({ navigation }) => {
     setModalMessage('');
     setModalTasks([]);
   };
+
+  const closeSubscriptionModal = () => {
+    setSubscriptionModalVisible(false);
+  };
+
+  const navigateToDiscover = () => {
+    closeSubscriptionModal();
+    navigation.navigate('Discover');
+    
+  };
+
+  const standardTasks = [
+    ...personalQuizzesTasks.slice(0, 1),
+    ...healthWellnessTasks.slice(0, 1),
+    ...generalKnowledgeTasks.slice(0, 1),
+    ...moneySavingsTasks.slice(0, 1),
+  ].map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
 
   return (
     <ScrollView style={styles.container}>
@@ -136,16 +199,16 @@ const HomeScreen = ({ navigation }) => {
               <Icon name="checkmark-circle" size={20} color="#FBF6E9" />
               <Text style={styles.topicButtonText}>Available</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Personal Quizzes', personalQuizzesTasks)}>
+            <TouchableOpacity style={styles.topicButtonStandard} onPress={() => showModal('Personal Quizzes', personalQuizzesTasks)}>
               <Text style={styles.topicButtonText}>Personal Quizzes</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Health & Wellness', healthWellnessTasks)}>
+            <TouchableOpacity style={styles.topicButtonStandard} onPress={() => showModal('Health & Wellness', healthWellnessTasks)}>
               <Text style={styles.topicButtonText}>Health & Wellness</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('General Knowledge', generalKnowledgeTasks)}>
+            <TouchableOpacity style={styles.topicButtonStandard} onPress={() => showModal('General Knowledge', generalKnowledgeTasks)}>
               <Text style={styles.topicButtonText}>General Knowledge</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButton} onPress={() => showModal('Money & Savings', moneySavingsTasks)}>
+            <TouchableOpacity style={styles.topicButtonStandard} onPress={() => showModal('Money & Savings', moneySavingsTasks)}>
               <Text style={styles.topicButtonText}>Money & Savings</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -155,12 +218,49 @@ const HomeScreen = ({ navigation }) => {
           <Icon name="medal" size={24} color="orange" style={styles.medalIcon} />
         </View>
         <View style={styles.taskItems}>
-          <Text style={styles.subtitle}>Your Tasks [3] </Text>
+          <Text style={styles.subtitle}>Your Tasks [4] </Text>
         </View>
         <FlatList
           data={tasks}
           renderItem={renderItem}
           keyExtractor={item => item.id}
+          contentContainerStyle={styles.taskList}
+        />
+        <Text style={styles.title}>Standard Tasks</Text>
+        <FlatList
+          data={standardTasks}
+          renderItem={({ item }) => {
+            const isInitialTask = item.category === 'initial';
+
+            return (
+              <View style={styles.taskContainer}>
+                <Text style={styles.taskTitle}>{item.title}</Text>
+                {!isInitialTask && (
+                  <View style={styles.premiumContainer}>
+                    <Icon name="diamond" size={20} color="orange" />
+                    <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
+                  </View>
+                )}
+                <Text style={styles.taskDescription}>{item.description}</Text>
+                <View style={styles.taskFooter}>
+                  <View style={styles.amountContainer}>
+                    <Icon name="cash" size={20} color="orange" />
+                    <Text style={styles.amountText}>KSH {item.amount}</Text>
+                  </View>
+                  {isInitialTask ? (
+                    <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
+                      <Text style={styles.startButtonText}>Start Task</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
+                      <Text style={styles.subscribeButtonText}>Start Task</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            );
+          }}
+          keyExtractor={(item, index) => `${item.category}-${index}`}
           contentContainerStyle={styles.taskList}
         />
       </View>
@@ -175,33 +275,62 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.modalText}>{modalMessage}</Text>
             <FlatList
               data={modalTasks}
-              renderItem={({ item }) => (
-                <View style={styles.taskContainer}>
-                  <Text style={styles.taskTitle}>{item.title}</Text>
-                  {item.category !== 'initial' && (
-                      <View style={styles.premiumContainer}>
-                        <Icon name="diamond" size={20} color="orange" />
-                        <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
+              renderItem={({ item }) => {
+                const isInitialTask = item.category === 'initial';
+                return (
+                  <View style={styles.taskContainer}>
+                    <Text style={styles.taskTitle}>{item.title}</Text>
+                    {!isInitialTask && (
+                        <View style={styles.premiumContainer}>
+                          <Icon name="diamond" size={20} color="orange" />
+                          <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
+                        </View>
+                      )}
+                    <Text style={styles.taskDescription}>{item.description}</Text>
+                    <View style={styles.taskFooter}>
+                      <View style={styles.amountContainer}>
+                        <Icon name="cash" size={20} color="orange" />
+                        <Text style={styles.amountText}>KSH {item.amount}</Text>
                       </View>
-                    )}
-                  <Text style={styles.taskDescription}>{item.description}</Text>
-                  <View style={styles.taskFooter}>
-                    <View style={styles.amountContainer}>
-                      <Icon name="cash" size={20} color="orange" />
-                      <Text style={styles.amountText}>KSH {item.amount}</Text>
+                      
+                      {isInitialTask ? (
+                        <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
+                          <Text style={styles.startButtonText}>Start Task</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
+                          <Text style={styles.subscribeButtonText}>Start Task</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                    
-                    <TouchableOpacity style={styles.startButton} onPress={() => showModal(`Starting ${item.title}`)}>
-                      <Text style={styles.startButtonText}>Start Task</Text>
-                    </TouchableOpacity>
                   </View>
-                </View>
-              )}
+                );
+              }}
               keyExtractor={item => item.id}
               contentContainerStyle={styles.taskList}
             />
             <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
               <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={subscriptionModalVisible}
+        onRequestClose={closeSubscriptionModal}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.subscriptionModalContent}>
+            <Text style={styles.subscriptionModalText}>
+              Hello! {username} 👋 {"\n"}
+              You're on Basic Mode and missing out on daily tasks with higher rewards! {"\n"}
+              Upgrade to Standard for just KSH 350 or explore Premium and Elite for even more earnings!
+            </Text>
+            <Text style={styles.subscriptionModalSubText}>Upgrade now and start earning more!</Text>
+            <TouchableOpacity style={styles.subscribeButton} onPress={navigateToDiscover}>
+              <Text style={styles.subscribeButtonText}>Choose Subscription</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -335,6 +464,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-Regular',
   },
+  subscribeButton: {
+    backgroundColor: 'orange',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 2,
+  },
+  subscribeButtonText: {
+    color: '#FBF6E9',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+  },
   topicSelectActions: {
     flexDirection: 'row',
     gap: 15,
@@ -343,6 +483,14 @@ const styles = StyleSheet.create({
   },
   topicButton: {
     backgroundColor: '#5DB996',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  topicButtonStandard: {
+    backgroundColor: 'orange',
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 2,
@@ -401,6 +549,29 @@ const styles = StyleSheet.create({
     color: 'orange',
     fontWeight: 'bold',
     marginLeft: 5,
+  },
+  subscriptionModalContent: {
+    backgroundColor: '#FBF6E9',
+    padding: 20,
+    borderRadius: 2,
+    alignItems: 'center',
+    width: '90%',
+    maxHeight: '90%',
+  },
+  subscriptionModalText: {
+    fontSize: 16,
+    color: '#118B50',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 10,
+    fontWeight: 'bold',
+  },
+  subscriptionModalSubText: {
+    fontSize: 14,
+    color: '#118B50',
+    fontFamily: 'Inter-Regular',
+    marginBottom: 20,
+    fontWeight: 'bold',
+    color: 'orange',
   },
 });
 
