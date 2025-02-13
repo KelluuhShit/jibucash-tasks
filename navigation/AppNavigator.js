@@ -18,7 +18,7 @@ const AppNavigator = () => {
           if (route.name === 'Home') {
             iconName = 'home';
           } else if (route.name === 'Discover') {
-            iconName = 'search';
+            iconName = 'analytics-outline';
           } else if (route.name === 'Affiliate') {
             iconName = 'people';
           } else if (route.name === 'Wallet') {

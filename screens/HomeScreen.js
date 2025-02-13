@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -7,7 +7,7 @@ import { db } from '../services/firebase';
 import { initialTasks, personalQuizzesTasks, healthWellnessTasks, generalKnowledgeTasks, moneySavingsTasks } from '../data/tasks';
 
 const HomeScreen = ({ navigation }) => {
-  const [tasks, setTasks] = useState(initialTasks); // Use imported initial tasks
+  const [tasks, setTasks] = useState(initialTasks);
   const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
   const [subscription, setSubscription] = useState('Basic');
@@ -15,6 +15,7 @@ const HomeScreen = ({ navigation }) => {
   const [modalMessage, setModalMessage] = useState('');
   const [modalTasks, setModalTasks] = useState([]);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const generateUserId = () => {
@@ -33,11 +34,11 @@ const HomeScreen = ({ navigation }) => {
           storedUserId = generateUserId();
           await AsyncStorage.setItem('userId', storedUserId);
         }
-        setUserId(storedUserId);
-      } catch (error) {
-        console.error('Error getting user ID: ', error);
-      }
-    };
+          setUserId(storedUserId);
+        } catch (error) {
+          console.error('Error getting user ID: ', error);
+        }
+        };
 
     getUserId();
   }, []);
@@ -46,14 +47,14 @@ const HomeScreen = ({ navigation }) => {
     const fetchUsername = async () => {
       try {
         const storedUsername = await AsyncStorage.getItem('username');
-        if (storedUsername) {
-          setUsername(storedUsername);
-        } else {
-          setUsername('User');
+          if (storedUsername) {
+            setUsername(storedUsername);
+          } else {
+            setUsername('User');
+          }
+        } catch (error) {
+          console.error('Error fetching username: ', error);
         }
-      } catch (error) {
-        console.error('Error fetching username: ', error);
-      }
     };
 
     fetchUsername();
@@ -99,6 +100,22 @@ const HomeScreen = ({ navigation }) => {
       fetchTasks();
     }, [])
   );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Shuffle tasks
+    const shuffledTasks = [...initialTasks].sort(() => Math.random() - 0.5);
+    const shuffledStandardTasks = [
+      ...personalQuizzesTasks.slice(0, 1),
+      ...healthWellnessTasks.slice(0, 1),
+      ...generalKnowledgeTasks.slice(0, 1),
+      ...moneySavingsTasks.slice(0, 1),
+    ].sort(() => Math.random() - 0.5).map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
+
+    setTasks(shuffledTasks);
+    setStandardTasks(shuffledStandardTasks);
+    setRefreshing(false);
+  };
 
   const renderItem = ({ item }) => {
     const hours = Math.floor(item.timeLeft / (1000 * 60 * 60));
@@ -176,7 +193,9 @@ const HomeScreen = ({ navigation }) => {
   ].map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} refreshControl={
+      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+    }>
       <View style={styles.header}>
         <View style={styles.infoIcon}>
           <Icon name="person-circle" size={40} color="#E3F0AF" />
@@ -506,8 +525,8 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems:'center'
   },
   modalContent: {
     backgroundColor: '#FBF6E9',
@@ -555,6 +574,8 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 2,
     alignItems: 'center',
+    justifyContent: 'center',
+    alignItems:'center',
     width: '90%',
     maxHeight: '90%',
   },

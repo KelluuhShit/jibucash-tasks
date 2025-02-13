@@ -412,6 +412,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width:'100%'
   },
   modalContent: {
     width: '100%',
@@ -421,15 +422,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: '100%',
   },
+  modalScrollContainer:{
+    justifyContent: 'center',
+    width:'100%',
+    height:'100%',
+  },
   modalIcon: {
     alignItems: 'center',
     marginBottom: 10,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
     color: '#118B50',
+    textAlign: 'center',
   },
   modalDescription: {
     fontSize: 14,
@@ -483,6 +490,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 5, // For Android shadow
     backgroundColor: 'white',
+    width:'100%',
   },
   closeButtonText: {
     color: 'green',
@@ -498,6 +506,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
+    width:'100%',
   },
   initButtonText: {
     textAlign: 'center',
