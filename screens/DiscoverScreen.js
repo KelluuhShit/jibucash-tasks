@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: 15,
-    borderRadius: 2,
+    borderRadius: 10,
     marginBottom: 10,
     overflow: 'hidden',
     width: '100%',

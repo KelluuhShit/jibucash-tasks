@@ -103,6 +103,8 @@ const HomeScreen = ({ navigation }) => {
 
   const onRefresh = () => {
     setRefreshing(true);
+
+    
     // Shuffle tasks
     const shuffledTasks = [...initialTasks].sort(() => Math.random() - 0.5);
     const shuffledStandardTasks = [
@@ -111,9 +113,9 @@ const HomeScreen = ({ navigation }) => {
       ...generalKnowledgeTasks.slice(0, 1),
       ...moneySavingsTasks.slice(0, 1),
     ].sort(() => Math.random() - 0.5).map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
-
+  
     setTasks(shuffledTasks);
-    setStandardTasks(shuffledStandardTasks);
+    setStandardTasks(shuffledStandardTasks); // <-- Now this works
     setRefreshing(false);
   };
 
@@ -185,12 +187,12 @@ const HomeScreen = ({ navigation }) => {
     
   };
 
-  const standardTasks = [
+  const [standardTasks, setStandardTasks] = useState([
     ...personalQuizzesTasks.slice(0, 1),
     ...healthWellnessTasks.slice(0, 1),
     ...generalKnowledgeTasks.slice(0, 1),
     ...moneySavingsTasks.slice(0, 1),
-  ].map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
+  ].map((task, index) => ({ ...task, id: `${task.category}-${index}` })));
 
   return (
     <ScrollView style={styles.container} refreshControl={
@@ -234,7 +236,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
         <View style={styles.titleContainer}>
           <Text style={styles.title}>Complete Available Tasks Now and Unlock New Level</Text>
-          <Icon name="medal" size={24} color="orange" style={styles.medalIcon} />
+          <Icon name="star" size={20} color="orange" style={styles.medalIcon} />
         </View>
         <View style={styles.taskItems}>
           <Text style={styles.subtitle}>Your Tasks [4] </Text>
@@ -247,41 +249,41 @@ const HomeScreen = ({ navigation }) => {
         />
         <Text style={styles.title}>Standard Tasks</Text>
         <FlatList
-          data={standardTasks}
-          renderItem={({ item }) => {
-            const isInitialTask = item.category === 'initial';
+  data={standardTasks}
+  renderItem={({ item }) => {
+    const isInitialTask = item.category === 'initial';
 
-            return (
-              <View style={styles.taskContainer}>
-                <Text style={styles.taskTitle}>{item.title}</Text>
-                {!isInitialTask && (
-                  <View style={styles.premiumContainer}>
-                    <Icon name="diamond" size={20} color="orange" />
-                    <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
-                  </View>
-                )}
-                <Text style={styles.taskDescription}>{item.description}</Text>
-                <View style={styles.taskFooter}>
-                  <View style={styles.amountContainer}>
-                    <Icon name="cash" size={20} color="orange" />
-                    <Text style={styles.amountText}>KSH {item.amount}</Text>
-                  </View>
-                  {isInitialTask ? (
-                    <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
-                      <Text style={styles.startButtonText}>Start Task</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
-                      <Text style={styles.subscribeButtonText}>Start Task</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            );
-          }}
-          keyExtractor={(item, index) => `${item.category}-${index}`}
-          contentContainerStyle={styles.taskList}
-        />
+    return (
+      <View style={styles.taskContainer}>
+        <Text style={styles.taskTitle}>{item.title}</Text>
+        {!isInitialTask && (
+          <View style={styles.premiumContainer}>
+            <Icon name="diamond" size={20} color="orange" />
+            <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
+          </View>
+        )}
+        <Text style={styles.taskDescription}>{item.description}</Text>
+        <View style={styles.taskFooter}>
+          <View style={styles.amountContainer}>
+            <Icon name="cash" size={20} color="orange" />
+            <Text style={styles.amountText}>KSH {item.amount}</Text>
+          </View>
+          {isInitialTask ? (
+            <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
+              <Text style={styles.startButtonText}>Start Task</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
+              <Text style={styles.subscribeButtonText}>Start Task</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  }}
+  keyExtractor={(item, index) => `${item.category}-${index}`}
+  contentContainerStyle={styles.taskList}
+/>
       </View>
       <Modal
         animationType="slide"
@@ -436,13 +438,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
   taskContainer: {
-    backgroundColor: '#FBF6E9',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
     padding: 15,
-    borderRadius: 2,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#118B50',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     width: '100%',
+    marginTop: 10,
   },
   taskTitle: {
     fontSize: 14,
@@ -515,6 +521,11 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     flexDirection: 'row',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   topicButtonText: {
     color: '#FBF6E9',
