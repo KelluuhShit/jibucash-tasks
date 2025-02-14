@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet,Image, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { db } from '../services/firebase';
 import { initialTasks, personalQuizzesTasks, healthWellnessTasks, generalKnowledgeTasks, moneySavingsTasks } from '../data/tasks';
+import quizData from '../data/quizData';
+
 
 const HomeScreen = ({ navigation }) => {
   const [tasks, setTasks] = useState(initialTasks);
@@ -16,6 +18,10 @@ const HomeScreen = ({ navigation }) => {
   const [modalTasks, setModalTasks] = useState([]);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
+  const [quizModalVisible, setQuizModalVisible] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null); // To store the task clicked
+  const [selectedQuiz, setSelectedQuiz] = useState(null);
 
   useEffect(() => {
     const generateUserId = () => {
@@ -89,6 +95,13 @@ const HomeScreen = ({ navigation }) => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (selectedTask) {
+      const quizCategory = quizData.find(q => q.category === selectedTask.category);
+      setSelectedQuiz(quizCategory || null);
+    }
+  }, [selectedTask, quizModalVisible]);
+
   useFocusEffect(
     useCallback(() => {
       // Reset or update state when the screen comes into focus
@@ -145,7 +158,7 @@ const HomeScreen = ({ navigation }) => {
           )}
           {isInitialTask ? (
             <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
-              <Text style={styles.startButtonText}>Start Task</Text>
+            <Text style={styles.startButtonText}>Start Task</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
@@ -161,7 +174,12 @@ const HomeScreen = ({ navigation }) => {
     if (subscription === 'Basic' && !isInitialTask) {
       setSubscriptionModalVisible(true);
     } else {
-      showModal(`Starting ${item.title}`);
+       // Fetch corresponding quiz from quizData.js based on item.category
+       const selectedQuiz = quizData.find(q => q.category === item.category)?.questions || [];
+
+    setModalTasks(selectedQuiz); // Set the quiz data in modal state
+    setModalMessage(item.title); // Set task title in modal
+    setConfirmationModalVisible(true);
     }
   };
 
@@ -185,6 +203,16 @@ const HomeScreen = ({ navigation }) => {
     closeSubscriptionModal();
     navigation.navigate('Discover');
     
+  };
+
+
+
+  const handleAnswer = (question, selectedOption) => {
+    if (selectedOption === question.correctAnswer) {
+      alert('Correct!');
+    } else {
+      alert('Incorrect!');
+    }
   };
 
   const [standardTasks, setStandardTasks] = useState([
@@ -249,9 +277,9 @@ const HomeScreen = ({ navigation }) => {
         />
         <Text style={styles.title}>Standard Tasks</Text>
         <FlatList
-  data={standardTasks}
-  renderItem={({ item }) => {
-    const isInitialTask = item.category === 'initial';
+        data={standardTasks}
+        renderItem={({ item }) => {
+          const isInitialTask = item.category === 'initial';
 
     return (
       <View style={styles.taskContainer}>
@@ -356,6 +384,106 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
+
+      <Modal
+  animationType="slide"
+  transparent={true}
+  visible={confirmationModalVisible}
+  onRequestClose={() => setConfirmationModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalQuizContent}>
+    <Image source={require("../assets/images/startTask.png")} style={styles.taskImage} />
+      <Text style={styles.modalTitle}>Start Task</Text>
+      <Text style={styles.modalText}>
+        You are about to start the task:{"\n"}
+        <Text style={styles.taskName}>{modalMessage}</Text>
+      </Text>
+      <Text style={styles.instructions}>
+        Instructions:{"\n"}
+        1. Read each question carefully.{"\n"}
+        2. Select the correct answer.{"\n"}
+        3. Complete all questions to finish the task.
+      </Text>
+      <TouchableOpacity
+        style={styles.proceedButton}
+        onPress={() => {
+          setConfirmationModalVisible(false); // Close confirmation modal
+          setQuizModalVisible(true); // Open quiz modal
+        }}
+      >
+        <Text style={styles.proceedButtonText}>Proceed to Task</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.closeButton}
+        onPress={() => setConfirmationModalVisible(false)}
+      >
+        <Text style={styles.closeButtonText}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={quizModalVisible}
+  onRequestClose={() => setQuizModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalQuizContent}>
+      <Text style={styles.quizTitle}>Task Time: {modalMessage}</Text>
+      
+      {/* Display quiz questions */}
+      <FlatList
+        data={selectedQuiz?.questions || []} // Ensure fallback to empty array
+        renderItem={({ item }) => (
+          <View style={styles.quizQuestionContainer}>
+            <Text style={styles.question}>{item.question}</Text>
+            {item.choices.map((choice, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.optionButton}
+                onPress={() => handleAnswer(item, choice)}
+              >
+                <Text style={styles.optionText}>{choice}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        keyExtractor={(item, index) => index.toString()}
+        ListEmptyComponent={<Text style={styles.noDataText}>No questions available for this task.</Text>}
+      />
+
+<FlatList
+        data={quizData}
+        keyExtractor={(item, index) => index.toString()}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Text style={styles.category}>{item.category}</Text>
+
+            {item.questions.map((question, qIndex) => (
+              <View key={qIndex} style={styles.questionContainer}>
+                <Text style={styles.question}>{question.question}</Text>
+
+                {question.options.map((option, oIndex) => (
+                  <Text key={oIndex} style={styles.option}>- {option}</Text>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+      />
+      
+      {/* Close Button */}
+      <TouchableOpacity style={styles.closeButton} onPress={() => setQuizModalVisible(false)}>
+        <Text style={styles.closeButtonText}>Close</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
+      
     </ScrollView>
   );
 };
@@ -604,6 +732,88 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontWeight: 'bold',
     color: 'orange',
+  },
+  modalQuizContent: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    width: '100%',
+    minHeight: '100%',
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#118B50',
+    marginBottom: 10,
+  },
+  modalQuizText: {
+    fontSize: 16,
+    color: '#118B50',
+    textAlign: 'start',
+    marginBottom: 20,
+  },
+  taskName: {
+    fontWeight: 'bold',
+    color: 'orange',
+  },
+  taskImage: {
+    width: 250,  // Adjust width as needed
+    height: 250, // Adjust height as needed
+    alignSelf: "center",
+    marginBottom: 10, // Add some spacing
+  },
+  instructions: {
+    fontSize: 14,
+    color: '#118B50',
+    marginBottom: 20,
+  },
+  proceedButton: {
+    backgroundColor: '#118B50',
+    padding: 10,
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  proceedButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+  quizTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#118B50',
+    marginBottom: 10,
+  },
+  quizQuestionContainer: {
+    marginBottom: 20,
+  },
+  question: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#118B50',
+    marginBottom: 10,
+  },
+  optionButton: {
+    backgroundColor: '#FBF6E9',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 5,
+  },
+  optionText: {
+    fontSize: 14,
+    color: '#118B50',
+  },
+  closeButton: {
+    backgroundColor: '#5DB996',
+    padding: 10,
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
   },
 });
 
