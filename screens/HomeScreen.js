@@ -239,7 +239,7 @@ const HomeScreen = ({ navigation }) => {
           <Icon name="star" size={20} color="orange" style={styles.medalIcon} />
         </View>
         <View style={styles.taskItems}>
-          <Text style={styles.subtitle}>Your Tasks [4] </Text>
+          <Text style={styles.subtitle}>Your Tasks [3] </Text>
         </View>
         <FlatList
           data={tasks}

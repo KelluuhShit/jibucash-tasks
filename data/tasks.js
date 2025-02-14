@@ -4,7 +4,7 @@ const initialTasks = [
   { id: '1', title: 'Monetizing Social Media', description: 'Showcase strategies to earn money from platforms like Facebook, Instagram, or TikTok.', expiry: Date.now() + 24 * 60 * 60 * 1000, amount: 3, category: 'initial' },
   { id: '2', title: 'Affiliate Marketing Basics', description: 'Demonstrate how you can earn commissions by promoting products online.', expiry: Date.now() + 24 * 60 * 60 * 1000, amount: 2, category: 'initial' },
   { id: '3', title: 'Avoiding Online Scams', description: 'Highlight ways to identify and prevent financial fraud on social media.', expiry: Date.now() + 24 * 60 * 60 * 1000, amount: 2, category: 'initial' },
-  { id: '4', title: 'Watch Video and Earn', description: 'Earn money by watching promotional videos.', expiry: Date.now() + 24 * 60 * 60 * 1000, amount: 9, category: 'initial' },
+  // { id: '4', title: 'Watch Video and Earn', description: 'Earn money by watching promotional videos.', expiry: Date.now() + 24 * 60 * 60 * 1000, amount: 9, category: 'initial' },
 ];
 
 const personalQuizzesTasks = [
