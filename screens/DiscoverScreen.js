@@ -392,7 +392,8 @@ const styles = StyleSheet.create({
   subButton: {
     backgroundColor: '#5DB996',
     borderRadius: 5,
-    padding: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     alignItems: 'center',
     shadowColor: 'black',
     shadowOffset: { width: 3, height: 10 },
@@ -481,7 +482,8 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     marginTop: 20,
-    padding: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 5,
     shadowColor: 'black',
     shadowOffset: { width: 3, height: 10 },
@@ -499,7 +501,8 @@ const styles = StyleSheet.create({
   initiateButton: {
     backgroundColor: '#5DB996',
     borderRadius: 5,
-    padding: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     alignItems: 'center',
     shadowColor: 'black',
     shadowOffset: { width: 3, height: 10 },

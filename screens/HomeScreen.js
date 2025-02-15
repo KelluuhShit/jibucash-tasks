@@ -455,25 +455,25 @@ const HomeScreen = ({ navigation }) => {
         ListEmptyComponent={<Text style={styles.noDataText}>No questions available for this task.</Text>}
       />
 
-<FlatList
-        data={quizData}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.category}>{item.category}</Text>
+        <FlatList
+                data={quizData}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item }) => (
+                  <View style={styles.card}>
+                    <Text style={styles.category}>{item.category}</Text>
 
-            {item.questions.map((question, qIndex) => (
-              <View key={qIndex} style={styles.questionContainer}>
-                <Text style={styles.question}>{question.question}</Text>
+                    {item.questions.map((question, qIndex) => (
+                      <View key={qIndex} style={styles.questionContainer}>
+                        <Text style={styles.question}>{question.question}</Text>
 
-                {question.options.map((option, oIndex) => (
-                  <Text key={oIndex} style={styles.option}>- {option}</Text>
-                ))}
-              </View>
-            ))}
-          </View>
-        )}
-      />
+                        {question.options.map((option, oIndex) => (
+                          <Text key={oIndex} style={styles.option}>- {option}</Text>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                )}
+              />
       
       {/* Close Button */}
       <TouchableOpacity style={styles.closeButton} onPress={() => setQuizModalVisible(false)}>
@@ -769,7 +769,8 @@ const styles = StyleSheet.create({
   },
   proceedButton: {
     backgroundColor: '#118B50',
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 5,
     width: '100%',
     alignItems: 'center',
@@ -806,7 +807,8 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     backgroundColor: '#5DB996',
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 5,
     width: '100%',
     alignItems: 'center',

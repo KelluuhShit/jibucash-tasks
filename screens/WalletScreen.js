@@ -318,7 +318,8 @@ const styles = StyleSheet.create({
   withdrawButton: {
     backgroundColor: '#5DB996',
     borderRadius: 5,
-    padding: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     alignItems: 'center',
   },
   withdrawButtonText: {

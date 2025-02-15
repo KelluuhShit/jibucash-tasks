@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Image, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { db } from '../services/firebase';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
@@ -100,7 +100,9 @@ const SignUpScreen = ({ navigation }) => {
   };
 
   return (
+    <ScrollView style={styles.home}>
     <View style={styles.container}>
+      <Image source={require('../assets/images/createAcc.png')} style={styles.image} />
       <Text style={styles.title}>Create JibuCash Tasks Account</Text>
       <TextInput
         style={styles.input}
@@ -164,16 +166,23 @@ const SignUpScreen = ({ navigation }) => {
         <Text style={styles.signInText}>Already have an account? Sign In</Text>
       </TouchableOpacity>
     </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
+
+  home: {
+    flex: 1,
+    backgroundColor: '#FBF6E9',
+  },
   container: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
     backgroundColor: '#FBF6E9',
+    minHeight: '100%',
   },
   title: {
     fontSize: 24,
@@ -253,6 +262,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     marginTop: 20,
+  },
+  image: {
+    width: 170,
+    height: 170,
+    resizeMode: 'contain',
+    alignSelf: 'center',
+    marginBottom: 10,
   },
 });
 

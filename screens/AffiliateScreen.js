@@ -202,7 +202,8 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     backgroundColor: '#5DB996',
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 5,
     alignItems: 'center',
   },
@@ -291,7 +292,8 @@ const styles = StyleSheet.create({
   },
   ctaButton: {
     backgroundColor: '#118B50',
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 5,
     width: '100%',
     alignItems: 'center',
