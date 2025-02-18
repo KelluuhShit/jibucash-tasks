@@ -1,6 +1,6 @@
 const quizData = [
     {
-      category: "Monetizing Social Media",
+      id: '1',category: "Monetizing Social Media",
       questions: [
         {
           question: "What is one of the most common ways to earn money on Instagram?",
@@ -69,7 +69,7 @@ const quizData = [
       ],
     },
     {
-      category: "Affiliate Marketing Basics",
+      id: '2',category: "Affiliate Marketing Basics",
       questions: [
         {
           question: "What is affiliate marketing?",
@@ -138,7 +138,7 @@ const quizData = [
       ],
     },
     {
-      category: "Avoiding Online Scams",
+      id: '3', category: "Avoiding Online Scams",
       questions: [
         {
           question: "What is a common sign of an online scam?",

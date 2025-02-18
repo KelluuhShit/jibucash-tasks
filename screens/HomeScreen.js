@@ -8,8 +8,9 @@ import { initialTasks, personalQuizzesTasks, healthWellnessTasks, generalKnowled
 import quizData from '../data/quizData';
 
 
-const HomeScreen = ({ navigation }) => {
+const HomeScreen = ({ navigation}) => {
   const [tasks, setTasks] = useState(initialTasks);
+  const [questions, setQuestions] = useState(quizData);
   const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
   const [subscription, setSubscription] = useState('Basic');
@@ -20,7 +21,7 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
   const [quizModalVisible, setQuizModalVisible] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null); // To store the task clicked
+  const [selectedTask, setSelectedTask] = useState(null);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ const HomeScreen = ({ navigation }) => {
       }
       return result;
     };
+    
 
     const getUserId = async () => {
       try {
@@ -114,6 +116,7 @@ const HomeScreen = ({ navigation }) => {
     }, [])
   );
 
+
   const onRefresh = () => {
     setRefreshing(true);
 
@@ -170,16 +173,36 @@ const HomeScreen = ({ navigation }) => {
     );
   };
 
+  const renderQuiz = ({ item }) => {
+    return (
+      <View style={styles.quizQuestionContainer}>
+        <Text style={styles.questionTitle}>{item.question}</Text> {/* Render the question */}
+        {item.options.map((option, index) => ( // Map through the options array
+          <TouchableOpacity
+            key={index}
+            style={styles.optionButton}
+            onPress={() => handleAnswer(item, option)} // Handle answer selection
+          >
+            <Text style={styles.optionText}>{option}</Text> {/* Render each option */}
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity style={styles.goToNext} onPress={handleNextQuestion}>
+          <Text style={styles.goNextText}>Go to next</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const handleStartTask = (item, isInitialTask) => {
     if (subscription === 'Basic' && !isInitialTask) {
       setSubscriptionModalVisible(true);
     } else {
-       // Fetch corresponding quiz from quizData.js based on item.category
-       const selectedQuiz = quizData.find(q => q.category === item.category)?.questions || [];
-
-    setModalTasks(selectedQuiz); // Set the quiz data in modal state
-    setModalMessage(item.title); // Set task title in modal
-    setConfirmationModalVisible(true);
+      const selectedQuiz = quizData.find(q => q.category === item.category)?.questions || [];
+      if (selectedQuiz) {
+        setModalTasks(selectedQuiz); // Set the quiz data in modal state
+        setModalMessage(item.title); // Set task title in modal
+        setConfirmationModalVisible(true);
+      }
     }
   };
 
@@ -436,45 +459,12 @@ const HomeScreen = ({ navigation }) => {
       
       {/* Display quiz questions */}
       <FlatList
-        data={selectedQuiz?.questions || []} // Ensure fallback to empty array
-        renderItem={({ item }) => (
-          <View style={styles.quizQuestionContainer}>
-            <Text style={styles.question}>{item.question}</Text>
-            {item.choices.map((choice, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.optionButton}
-                onPress={() => handleAnswer(item, choice)}
-              >
-                <Text style={styles.optionText}>{choice}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        data={selectedQuiz?.questions || []} // Use selectedQuiz.questions
+        renderItem={renderQuiz}
         keyExtractor={(item, index) => index.toString()}
-        ListEmptyComponent={<Text style={styles.noDataText}>No questions available for this task.</Text>}
+        contentContainerStyle={styles.taskList}
       />
 
-        <FlatList
-                data={quizData}
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={({ item }) => (
-                  <View style={styles.card}>
-                    <Text style={styles.category}>{item.category}</Text>
-
-                    {item.questions.map((question, qIndex) => (
-                      <View key={qIndex} style={styles.questionContainer}>
-                        <Text style={styles.question}>{question.question}</Text>
-
-                        {question.options.map((option, oIndex) => (
-                          <Text key={oIndex} style={styles.option}>- {option}</Text>
-                        ))}
-                      </View>
-                    ))}
-                  </View>
-                )}
-              />
-      
       {/* Close Button */}
       <TouchableOpacity style={styles.closeButton} onPress={() => setQuizModalVisible(false)}>
         <Text style={styles.closeButtonText}>Close</Text>
@@ -817,6 +807,19 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
   },
+  goToNext:{
+    backgroundColor: '#118B50',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  goNextText:{
+    color: '#FFFFFF',
+    fontSize: 16,
+    textAlign:'center'
+  }
 });
 
 export default HomeScreen;
