@@ -260,11 +260,11 @@ const DiscoverScreen = () => {
               </View>
               <Text style={styles.modalManualPrice}>To Process and Complete your Subscription, Pay {modalContent.price} to FANAKA SOLUTIONS and Paste Your Message Below and Click Confirm Payment</Text>
               <TextInput
-                style={styles.phoneInput}
-                placeholder="Paste MPESA Message here"
-                value={mpesaMessage}
-                onChangeText={setMpesaMessage}
-              />
+                  style={styles.pasteInput}
+                  placeholder="Paste your MPESA message here..."
+                  multiline={true}
+                  scrollEnabled={false}
+                />
               {mpesaErrorMessage ? <Text style={styles.errorText}>{mpesaErrorMessage}</Text> : null}
               <TouchableOpacity style={styles.initiateButton} onPress={validateMpesaMessage}>
                 <Text style={styles.initButtonText}>Confirm Payment</Text>
@@ -470,6 +470,20 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginBottom: 30,
     fontFamily: 'Inter-Regular',
+  },
+  pasteInput:{
+    width: '100%',
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#118B50',
+    borderRadius: 5,
+    marginBottom: 30,
+    fontFamily: 'Inter-Regular',
+    height: 100,
+    textAlignVertical: 'top',
+    overflow: 'hidden', // Ensures wrapping instead of scrolling
+    multiline: true,
+    scrollEnabled: false,
   },
   errorText: {
     color: 'red',
