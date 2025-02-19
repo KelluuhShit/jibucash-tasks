@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet,Image, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet,Image, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,6 +23,9 @@ const HomeScreen = ({ navigation }) => {
   const [selectedTask, setSelectedTask] = useState(null); // To store the task clicked
   const [selectedQuiz, setSelectedQuiz] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [answerFeedback, setAnswerFeedback] = useState(null);
 
   useEffect(() => {
     const generateUserId = () => {
@@ -206,17 +209,15 @@ const HomeScreen = ({ navigation }) => {
     
   };
 
-  const openQuizModal = (category) => {
-    setModalMessage(category);
-    setCurrentQuestionIndex(0);
-    setQuizModalVisible(true);
+
+  const handleOptionSelect = (oIndex) => {
+    setSelectedOption(Number(oIndex));
+    setAnswerFeedback(null); // Reset feedback when a new option is selected
   };
 
   // Filter quiz data based on the selected category (modalMessage)
   const filteredQuizData = quizData.filter(item => item.category === modalMessage);
   const questions = filteredQuizData.length > 0 ? filteredQuizData[0].questions : [];
-
-
 
   // Handle navigation
   const handleNext = () => {
@@ -225,10 +226,49 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  const handleNextQuestion = () => {
+    if (selectedOption === null) {
+      setAnswerFeedback('Please select an option.');
+      return;
+    }
+  
+    // Convert correctAnswer to a number
+    const correctAnswerIndex = Number(questions[currentQuestionIndex].correctAnswer);
+  
+    console.log("Selected Option:", selectedOption);
+    console.log("Correct Answer Index:", correctAnswerIndex);
+    console.log("Comparison Result:", selectedOption === correctAnswerIndex);
+  
+    if (selectedOption === correctAnswerIndex) {
+      setAnswerFeedback('✅ Correct Answer!');
+    } else {
+      setAnswerFeedback('❌ Wrong Answer, Try Again');
+    }
+  
+    setTimeout(() => {
+      if (selectedOption === correctAnswerIndex) {
+        if (currentQuestionIndex < questions.length - 1) {
+          setCurrentQuestionIndex(currentQuestionIndex + 1);
+          setSelectedOption(null);
+          setAnswerFeedback(null);
+        } else {
+          setAnswerFeedback("🎉 Quiz Completed! You've earned rewards.");
+        }
+      } else {
+        setSelectedOption(null); // Reset selection for retry
+      }
+    }, 1000);
+  };
+
+
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
+  };
+
+  const handleSubmit = () => {
+    
   };
 
   const [standardTasks, setStandardTasks] = useState([
@@ -431,16 +471,25 @@ const HomeScreen = ({ navigation }) => {
         3. Complete all questions to finish the task.
       </Text>
       <TouchableOpacity
-        style={styles.proceedButton}
-        onPress={() => {
-          setConfirmationModalVisible(false); // Close confirmation modal
-          setQuizModalVisible(true); // Open quiz modal
-        }}
-      >
-        <Text style={styles.proceedButtonText}>Proceed to Task</Text>
-      </TouchableOpacity>
+          style={styles.proceedButton}
+          onPress={() => {
+            setIsLoading(true); // Show loader
+
+            setTimeout(() => {
+              setIsLoading(false); // Hide loader
+              setConfirmationModalVisible(false); // Close confirmation modal
+              setQuizModalVisible(true); // Open quiz modal
+            }, 3000); // 3 seconds delay
+          }}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#fff" size="small" /> // Loader while waiting
+          ) : (
+            <Text style={styles.proceedButtonText}>Proceed To Task</Text>
+          )}
+        </TouchableOpacity>
       <TouchableOpacity
-        style={styles.closeButton}
+        style={styles.closeConfirm}
         onPress={() => setConfirmationModalVisible(false)}
       >
         <Text style={styles.closeButtonText}>Cancel</Text>
@@ -450,59 +499,88 @@ const HomeScreen = ({ navigation }) => {
 </Modal>
 
 <Modal
-        animationType="slide"
-        transparent={true}
-        visible={quizModalVisible}
-        onRequestClose={() => setQuizModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalQuizContent}>
-            <Text style={styles.quizTitle}>Task Time: {modalMessage}</Text>
+  animationType="fade"
+  transparent={true}
+  visible={quizModalVisible}
+  onRequestClose={() => setQuizModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalQuizContent}>
+      
+      <Text style={styles.quizTitle}>Task Time: {modalMessage}</Text>
 
-            {questions.length > 0 ? (
-              <FlatList
-                data={[questions[currentQuestionIndex]]} // Show only one question at a time
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={({ item }) => (
-                  <View style={styles.questionContainer}>
-                    <Text style={styles.question}>{item.question}</Text>
-                    {item.options.map((option, oIndex) => (
-                      <TouchableOpacity key={oIndex} style={styles.optionButton}>
-                        <Text style={styles.optionText}>{option}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              />
-            ) : (
-              <Text style={styles.noDataText}>No questions available for this category.</Text>
-            )}
-
-            {/* Navigation Buttons */}
-            <View style={styles.navigationButtons}>
-              <TouchableOpacity
-                style={[styles.navButton, currentQuestionIndex === 0 && styles.disabledButton]}
-                onPress={handlePrevious}
-                disabled={currentQuestionIndex === 0}
-              >
-                <Text style={styles.navButtonText}>Previous</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.navButton,
-                  currentQuestionIndex === questions.length - 1 && styles.disabledButton,
-                ]}
-                onPress={handleNext}
-                disabled={currentQuestionIndex === questions.length - 1}
-              >
-                <Text style={styles.navButtonText}>Next</Text>
-              </TouchableOpacity>
+      {questions.length > 0 ? (
+        <FlatList
+          data={[questions[currentQuestionIndex]]}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.questionContainer}>
+              <Text style={styles.question}>{item.question}</Text>
+              {item.options.map((option, oIndex) => {
+                const isSelected = selectedOption === oIndex;
+                return (
+                  <TouchableOpacity
+                    key={oIndex}
+                    style={[styles.optionButton, isSelected && styles.selectedOption]}
+                    onPress={() => handleOptionSelect(oIndex)}
+                    accessibilityLabel={`Option ${oIndex + 1}: ${option}`}
+                  >
+                    <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+          )}
+        />
+      ) : (
+        <Text style={styles.noDataText}>No questions available for this category.</Text>
+      )}
 
-          </View>
-        </View>
-      </Modal>
+      {/* Answer Feedback */}
+      {answerFeedback && (
+        <Text
+          style={[
+            styles.feedbackText,
+            answerFeedback === 'Correct Answer' ? styles.correctText : styles.wrongText,
+          ]}
+        >
+          {answerFeedback}
+        </Text>
+      )}
+
+      {/* Navigation Buttons */}
+      <View style={styles.navigationButtons}>
+        <TouchableOpacity
+          style={[styles.navButton, currentQuestionIndex === 0 && styles.disabledButton]}
+          onPress={handlePrevious}
+          disabled={currentQuestionIndex === 0}
+        >
+          <Text style={styles.navButtonText}>Previous</Text>
+        </TouchableOpacity>
+
+        {currentQuestionIndex < questions.length - 1 ? (
+          <TouchableOpacity
+            style={[styles.navButton, selectedOption === null && styles.disabledButton]}
+            onPress={handleNextQuestion}
+            disabled={selectedOption === null}
+          >
+            <Text style={styles.navButtonText}>Next</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.submitButton, selectedOption === null && styles.disabledButton]}
+            onPress={handleSubmit}
+            disabled={selectedOption === null}
+          >
+            <Text style={styles.submitButtonText}>Submit</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  </View>
+</Modal>
 
       
     </ScrollView>
@@ -774,16 +852,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#118B50',
     marginBottom: 10,
+    fontFamily: 'Inter-Regular',
   },
   modalQuizText: {
     fontSize: 16,
     color: '#118B50',
     textAlign: 'start',
     marginBottom: 20,
+    fontFamily: 'Inter-Regular',
   },
   taskName: {
     fontWeight: 'bold',
     color: 'orange',
+    fontFamily: 'Inter-Regular',
   },
   taskImage: {
     width: 250,  // Adjust width as needed
@@ -795,6 +876,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#118B50',
     marginBottom: 20,
+    fontFamily: 'Inter-Regular',
   },
   proceedButton: {
     backgroundColor: '#118B50',
@@ -808,31 +890,17 @@ const styles = StyleSheet.create({
   proceedButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontFamily: 'Inter-Regular',
   },
   quizTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#118B50',
     marginBottom: 10,
+    fontFamily: 'Inter-Regular',
   },
   quizQuestionContainer: {
     marginBottom: 20,
-  },
-  question: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#118B50',
-    marginBottom: 10,
-  },
-  optionButton: {
-    backgroundColor: '#FBF6E9',
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 5,
-  },
-  optionText: {
-    fontSize: 14,
-    color: '#118B50',
   },
   cancelButton: {
     backgroundColor: '#5DB996',
@@ -842,7 +910,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  closeButton: {
+  closeConfirm: {
     backgroundColor: '#dc3545',
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -853,6 +921,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontFamily: 'Inter-Regular',
   },
   questionContainer: {
     width: '100%',
@@ -865,17 +934,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 15,
+    fontFamily: 'Inter-Regular',
   },
   optionButton: {
-    backgroundColor: '#5DB996',
+    borderWidth:2,
     padding: 10,
     borderRadius: 5,
     marginBottom: 10,
+    borderColor:'#5DB996'
   },
   optionText: {
     fontSize: 16,
-    color: '#fff',
+    color: '#5DB996',
     textAlign: 'center',
+    fontFamily: 'Inter-Regular',
+  },
+  selectedOption: {
+    backgroundColor: '#5DB996',
+  },
+  selectedOptionText: {
+    color: '#fff',
   },
   navigationButtons: {
     flexDirection: 'row',
@@ -893,6 +971,7 @@ const styles = StyleSheet.create({
   navButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontFamily: 'Inter-Regular',
   },
   disabledButton: {
     backgroundColor: '#ccc',

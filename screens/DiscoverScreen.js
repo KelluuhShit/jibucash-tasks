@@ -7,7 +7,7 @@ import Icon from 'react-native-vector-icons/Ionicons'; // Import Ionicons
 const DiscoverScreen = () => {
   // Animation for shiny effect
   const shineAnim = new Animated.Value(0);
-  const shakeAnim = new Animated.Value(0); // Animation for shake
+  const shakeAnim = new Animated.Value(0);
   const [username, setUsername] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [manualModalVisible, setManualModalVisible] = useState(false);
