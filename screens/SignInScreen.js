@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Modal, Image } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Modal, Image, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '../services/firebase';
@@ -89,6 +89,7 @@ const SignInScreen = ({ navigation }) => {
   };
 
   return (
+    <ScrollView style={styles.home}>
     <View style={styles.container}>
       <Image source={require('../assets/images/welcomeback.png')} style={styles.image} />
       <Text style={styles.title}>Welcome back to JibuCash Tasks {username}</Text>
@@ -133,15 +134,21 @@ const SignInScreen = ({ navigation }) => {
         </View>
       </Modal>
     </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
+  home: {
+    flex: 1,
+    backgroundColor: '#FBF6E9',
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
     padding: 20,
     backgroundColor: '#FBF6E9',
+    minHeight:'100%'
   },
   image: {
     width: 200,

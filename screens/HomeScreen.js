@@ -22,6 +22,7 @@ const HomeScreen = ({ navigation }) => {
   const [quizModalVisible, setQuizModalVisible] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null); // To store the task clicked
   const [selectedQuiz, setSelectedQuiz] = useState(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   useEffect(() => {
     const generateUserId = () => {
@@ -205,13 +206,28 @@ const HomeScreen = ({ navigation }) => {
     
   };
 
+  const openQuizModal = (category) => {
+    setModalMessage(category);
+    setCurrentQuestionIndex(0);
+    setQuizModalVisible(true);
+  };
+
+  // Filter quiz data based on the selected category (modalMessage)
+  const filteredQuizData = quizData.filter(item => item.category === modalMessage);
+  const questions = filteredQuizData.length > 0 ? filteredQuizData[0].questions : [];
 
 
-  const handleAnswer = (question, selectedOption) => {
-    if (selectedOption === question.correctAnswer) {
-      alert('Correct!');
-    } else {
-      alert('Incorrect!');
+
+  // Handle navigation
+  const handleNext = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
   };
 
@@ -235,9 +251,18 @@ const HomeScreen = ({ navigation }) => {
           <Icon name="notifications" size={30} color="#E3F0AF" style={styles.notificationIcon} />
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.username}>{username}</Text>
-          <Text style={styles.userId}>ID: {userId}</Text>
-          <Text style={styles.subscription}>Subscription: {subscription}</Text>
+          <View>
+            <Text style={styles.username}>{username}</Text>
+            <Text style={styles.userId}>ID: {userId}</Text>
+            <Text style={styles.subscription}>Subscription: {subscription}</Text>
+          </View>
+
+          <View>
+            <Text style={styles.username}>Completed Today</Text>
+            <Text style={styles.taskCount}>0 / 3 Tasks</Text>
+            
+          </View>
+
         </View>
       </View>
       <View style={styles.homeContent}>
@@ -425,43 +450,59 @@ const HomeScreen = ({ navigation }) => {
 </Modal>
 
 <Modal
-  animationType="slide"
-  transparent={true}
-  visible={quizModalVisible}
-  onRequestClose={() => setQuizModalVisible(false)}
->
-  <View style={styles.modalContainer}>
-    <View style={styles.modalQuizContent}>
-      <Text style={styles.quizTitle}>Task Time: {modalMessage}</Text>
-      
+        animationType="slide"
+        transparent={true}
+        visible={quizModalVisible}
+        onRequestClose={() => setQuizModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalQuizContent}>
+            <Text style={styles.quizTitle}>Task Time: {modalMessage}</Text>
 
-<FlatList
-  data={quizData.filter(item => item.category === modalMessage)} // Filter by modalMessage title
-  keyExtractor={(item, index) => index.toString()}
-  renderItem={({ item }) => (
-    <View style={styles.card}>
+            {questions.length > 0 ? (
+              <FlatList
+                data={[questions[currentQuestionIndex]]} // Show only one question at a time
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item }) => (
+                  <View style={styles.questionContainer}>
+                    <Text style={styles.question}>{item.question}</Text>
+                    {item.options.map((option, oIndex) => (
+                      <TouchableOpacity key={oIndex} style={styles.optionButton}>
+                        <Text style={styles.optionText}>{option}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              />
+            ) : (
+              <Text style={styles.noDataText}>No questions available for this category.</Text>
+            )}
 
-      {item.questions.map((question, qIndex) => (
-        <View key={qIndex} style={styles.questionContainer}>
-          <Text style={styles.question}>{question.question}</Text>
+            {/* Navigation Buttons */}
+            <View style={styles.navigationButtons}>
+              <TouchableOpacity
+                style={[styles.navButton, currentQuestionIndex === 0 && styles.disabledButton]}
+                onPress={handlePrevious}
+                disabled={currentQuestionIndex === 0}
+              >
+                <Text style={styles.navButtonText}>Previous</Text>
+              </TouchableOpacity>
 
-          {question.options.map((option, oIndex) => (
-            <Text key={oIndex} style={styles.option}>- {option}</Text>
-          ))}
+              <TouchableOpacity
+                style={[
+                  styles.navButton,
+                  currentQuestionIndex === questions.length - 1 && styles.disabledButton,
+                ]}
+                onPress={handleNext}
+                disabled={currentQuestionIndex === questions.length - 1}
+              >
+                <Text style={styles.navButtonText}>Next</Text>
+              </TouchableOpacity>
+            </View>
+
+          </View>
         </View>
-      ))}
-    </View>
-  )}
-  ListEmptyComponent={<Text style={styles.noDataText}>No tasks available for this category.</Text>}
-/>
-      
-      {/* Close Button */}
-      {/* <TouchableOpacity style={styles.closeButton} onPress={() => setQuizModalVisible(false)}>
-        <Text style={styles.closeButtonText}>Close</Text>
-      </TouchableOpacity> */}
-    </View>
-  </View>
-</Modal>
+      </Modal>
 
       
     </ScrollView>
@@ -491,7 +532,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   userInfo: {
-    marginLeft: 20,
+    paddingLeft: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingRight: 20,
   },
   username: {
     fontSize: 18,
@@ -502,6 +546,11 @@ const styles = StyleSheet.create({
   userId: {
     fontSize: 14,
     color: '#FBF6E9',
+    fontFamily: 'Inter-Regular',
+  },
+  taskCount: {
+    fontSize: 14,
+    color: 'orange',
     fontFamily: 'Inter-Regular',
   },
   subscription: {
@@ -549,14 +598,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
     padding: 15,
-    marginBottom: 8,
+    marginBottom: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
     width: '100%',
-    marginTop: 10,
+    marginTop: 5,
   },
   taskTitle: {
     fontSize: 14,
@@ -805,19 +854,54 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
   },
-  goToNext:{
-    backgroundColor: '#118B50',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
+  questionContainer: {
     width: '100%',
+    marginBottom: 20,
+    padding: 10,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 5,
+  },
+  question: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 15,
+  },
+  optionButton: {
+    backgroundColor: '#5DB996',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  optionText: {
+    fontSize: 16,
+    color: '#fff',
+    textAlign: 'center',
+  },
+  navigationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 20,
+  },
+  navButton: {
+    backgroundColor: '#5DB996',
+    padding: 10,
+    borderRadius: 5,
+    width: '45%',
     alignItems: 'center',
   },
-  goNextText:{
-    color: '#FFFFFF',
+  navButtonText: {
+    color: '#fff',
     fontSize: 16,
-    textAlign:'center'
-  }
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+  },
+ 
+  noDataText: {
+    fontSize: 16,
+    color: '#888',
+  },
 });
 
 export default HomeScreen;
