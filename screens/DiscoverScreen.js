@@ -262,6 +262,8 @@ const DiscoverScreen = () => {
               <TextInput
                   style={styles.pasteInput}
                   placeholder="Paste your MPESA message here..."
+                  value={mpesaMessage}
+                  onChangeText={setMpesaMessage}
                   multiline={true}
                   scrollEnabled={false}
                 />

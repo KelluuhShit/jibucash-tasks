@@ -26,6 +26,7 @@ const HomeScreen = ({ navigation }) => {
   const [selectedOption, setSelectedOption] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [answerFeedback, setAnswerFeedback] = useState(null);
+  const [quizCompleted, setQuizCompleted] = useState(false);
 
   useEffect(() => {
     const generateUserId = () => {
@@ -210,8 +211,8 @@ const HomeScreen = ({ navigation }) => {
   };
 
 
-  const handleOptionSelect = (oIndex) => {
-    setSelectedOption(Number(oIndex));
+  const handleOptionSelect = (optionText) => {
+    setSelectedOption(optionText); // Store the text of the selected option
     setAnswerFeedback(null); // Reset feedback when a new option is selected
   };
 
@@ -232,27 +233,34 @@ const HomeScreen = ({ navigation }) => {
       return;
     }
   
-    // Convert correctAnswer to a number
-    const correctAnswerIndex = Number(questions[currentQuestionIndex].correctAnswer);
+    // Get the correct answer for the current question
+    const correctAnswer = questions[currentQuestionIndex].correctAnswer;
   
     console.log("Selected Option:", selectedOption);
-    console.log("Correct Answer Index:", correctAnswerIndex);
-    console.log("Comparison Result:", selectedOption === correctAnswerIndex);
+    console.log("Correct Answer:", correctAnswer);
+    console.log("Comparison Result:", selectedOption === correctAnswer);
   
-    if (selectedOption === correctAnswerIndex) {
+    if (selectedOption === correctAnswer) {
       setAnswerFeedback('✅ Correct Answer!');
     } else {
       setAnswerFeedback('❌ Wrong Answer, Try Again');
     }
   
     setTimeout(() => {
-      if (selectedOption === correctAnswerIndex) {
+      if (selectedOption === correctAnswer) {
         if (currentQuestionIndex < questions.length - 1) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
-          setSelectedOption(null);
-          setAnswerFeedback(null);
+          setSelectedOption(null); // Reset selection for the next question
+          setAnswerFeedback(null); // Reset feedback
         } else {
           setAnswerFeedback("🎉 Quiz Completed! You've earned rewards.");
+          // Optionally, close the quiz modal or reset the quiz state
+          setTimeout(() => {
+            setQuizModalVisible(false);
+            setCurrentQuestionIndex(0); // Reset to the first question
+            setSelectedOption(null); // Reset selection
+            setAnswerFeedback(null); // Reset feedback
+          }, 2000); // Close the modal after 2 seconds
         }
       } else {
         setSelectedOption(null); // Reset selection for retry
@@ -267,9 +275,23 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  useEffect(() => {
+    if (quizModalVisible) {
+      setQuizCompleted(false);
+      setCurrentQuestionIndex(0); // Reset the quiz to the first question
+      setSelectedOption(null); // Reset the selected option
+    }
+  }, [quizModalVisible]);
+
   const handleSubmit = () => {
-    
+    if (selectedOption !== null) {
+      handleOptionSelect(selectedOption);
+      setQuizCompleted(true);
+      console.log("Submitting last selection:", selectedOption);
+  
+    }
   };
+  
 
   const [standardTasks, setStandardTasks] = useState([
     ...personalQuizzesTasks.slice(0, 1),
@@ -505,45 +527,51 @@ const HomeScreen = ({ navigation }) => {
   onRequestClose={() => setQuizModalVisible(false)}
 >
   <View style={styles.modalContainer}>
+  
     <View style={styles.modalQuizContent}>
-      
+        {quizCompleted ? (
+      <Text style={styles.completionText}>QUIZ COMPLETED. EARNINGS ARE BEING CALCULATED.</Text>
+    ) : (
+      <>
       <Text style={styles.quizTitle}>Task Time: {modalMessage}</Text>
 
-      {questions.length > 0 ? (
-        <FlatList
-          data={[questions[currentQuestionIndex]]}
-          keyExtractor={(item, index) => index.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.questionContainer}>
-              <Text style={styles.question}>{item.question}</Text>
-              {item.options.map((option, oIndex) => {
-                const isSelected = selectedOption === oIndex;
-                return (
-                  <TouchableOpacity
-                    key={oIndex}
-                    style={[styles.optionButton, isSelected && styles.selectedOption]}
-                    onPress={() => handleOptionSelect(oIndex)}
-                    accessibilityLabel={`Option ${oIndex + 1}: ${option}`}
-                  >
-                    <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
-                      {option}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-        />
-      ) : (
-        <Text style={styles.noDataText}>No questions available for this category.</Text>
-      )}
+      
+    {questions.length > 0 ? (
+      <FlatList
+        data={[questions[currentQuestionIndex]]}
+        keyExtractor={(item, index) => index.toString()}
+        renderItem={({ item }) => (
+          <View style={styles.questionContainer}>
+            <Text style={styles.question}>{item.question}</Text>
+            {item.options.map((option, oIndex) => {
+              const isSelected = selectedOption === option;
+              return (
+                <TouchableOpacity
+                  key={oIndex}
+                  style={[styles.optionButton, isSelected && styles.selectedOption]}
+                  onPress={() => handleOptionSelect(option)}
+                >
+                  <Text style={[styles.optionText, isSelected && styles.selectedOptionText]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      />
+    ) : (
+      <Text style={styles.noDataText}>No questions available for this category.</Text>
+    )}
+  
+
 
       {/* Answer Feedback */}
       {answerFeedback && (
         <Text
           style={[
             styles.feedbackText,
-            answerFeedback === 'Correct Answer' ? styles.correctText : styles.wrongText,
+            answerFeedback.includes('✅') ? styles.correctText : styles.wrongText,
           ]}
         >
           {answerFeedback}
@@ -574,12 +602,16 @@ const HomeScreen = ({ navigation }) => {
             onPress={handleSubmit}
             disabled={selectedOption === null}
           >
-            <Text style={styles.submitButtonText}>Submit</Text>
+            <Text style={styles.submitButtonText}>Submit </Text>
           </TouchableOpacity>
         )}
       </View>
+      </>
+    )}
     </View>
+    
   </View>
+  
 </Modal>
 
       
@@ -973,6 +1005,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
   },
+  submitButton: {
+    backgroundColor: '#118B50',
+    padding: 10,
+    borderRadius: 5,
+    width: '45%',
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    textAlign:'center',
+  },
   disabledButton: {
     backgroundColor: '#ccc',
   },
@@ -981,6 +1026,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#888',
   },
+  completionText: {
+  fontSize: 18,
+  fontWeight: "bold",
+  textAlign: "center",
+  color: "green",
+  marginTop: 20,
+},
+
 });
 
 export default HomeScreen;

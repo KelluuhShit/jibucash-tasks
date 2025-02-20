@@ -52,8 +52,8 @@ const WalletScreen = () => {
       setAmountError('Invalid amount');
       return false;
     }
-    if (amountNumber < 900) {
-      setAmountError('Minimum withdrawal is KSH 900');
+    if (amountNumber < 199) {
+      setAmountError('Minimum withdrawal is KSH 199');
       return false;
     }
     if (amountNumber > balance) {
