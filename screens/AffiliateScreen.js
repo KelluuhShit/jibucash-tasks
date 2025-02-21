@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#118B50',
     fontFamily: 'Inter-Bold',
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     overflow:'hidden',
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#118B50',
     marginBottom: 15,
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   referralCode: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#5DB996',
     fontFamily: 'Inter-Regular',
   },
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   },
   shareButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
   },
   earningsContainer: {
@@ -221,12 +221,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   earningLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#5DB996',
     fontFamily: 'Inter-Regular',
   },
   earningValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#118B50',
     fontFamily: 'Inter-Bold',
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   referralName: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#118B50',
     fontFamily: 'Inter-Regular',
   },
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
   },
   referralEarnings: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#118B50',
     fontFamily: 'Inter-Bold',
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   emptyStateText: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#118B50',
     marginTop: 10,
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   ctaText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#FFFFFF',
     fontFamily: 'Inter-Regular',
     marginBottom: 10,
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   },
   ctaButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
   },
 });

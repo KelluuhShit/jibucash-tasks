@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,34 +12,50 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 
-const WalletScreen = () => {
+const WalletScreen = ({ navigation }) => {
   const [username, setUsername] = useState('');
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [mpesaNumber, setMpesaNumber] = useState('');
   const [amountError, setAmountError] = useState('');
   const [mpesaError, setMpesaError] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // Loader state
-  const [isModalVisible, setIsModalVisible] = useState(false); // Modal state
-  const [balance, setBalance] = useState(5000.0); // Balance state
-  const [transactions, setTransactions] = useState([]); // Transaction history state
+  const [isLoading, setIsLoading] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [userBalance, setUserBalance] = useState(0.00);
+  const [transactions, setTransactions] = useState([]);
 
+  // Function to load balance
+  const loadBalance = useCallback(async () => {
+    try {
+      const storedBalance = await AsyncStorage.getItem('userBalance');
+      setUserBalance(storedBalance ? parseFloat(storedBalance) : 0);
+    } catch (error) {
+      console.error('Error loading balance:', error);
+    }
+  }, []);
+
+  // Load initial data
   useEffect(() => {
     const fetchUsername = async () => {
       try {
         const storedUsername = await AsyncStorage.getItem('username');
-        if (storedUsername) {
-          setUsername(storedUsername);
-        } else {
-          setUsername('User');
-        }
+        setUsername(storedUsername || 'User');
       } catch (error) {
-        console.error('Error fetching username: ', error);
+        console.error('Error fetching username:', error);
       }
     };
 
     fetchUsername();
-  }, []);
+    loadBalance();
+  }, [loadBalance]);
+
+  // Refresh balance when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadBalance();
+    }, [loadBalance])
+  );
 
   // Validate withdrawal amount
   const validateAmount = (amount) => {
@@ -56,7 +72,7 @@ const WalletScreen = () => {
       setAmountError('Minimum withdrawal is KSH 199');
       return false;
     }
-    if (amountNumber > balance) {
+    if (amountNumber > userBalance) { // Use userBalance instead of balance
       setAmountError('Insufficient balance');
       return false;
     }
@@ -79,29 +95,37 @@ const WalletScreen = () => {
   };
 
   // Handle withdrawal
-  const handleWithdrawal = () => {
+  const handleWithdrawal = async () => {
     const isAmountValid = validateAmount(withdrawalAmount);
     const isMpesaValid = validateMpesaNumber(mpesaNumber);
 
     if (isAmountValid && isMpesaValid) {
-      setIsLoading(true); // Show loader
+      setIsLoading(true);
 
-      // Simulate a 4-second loading process
-      setTimeout(() => {
-        setIsLoading(false); // Hide loader
-        setIsModalVisible(true); // Show modal
+      setTimeout(async () => {
+        try {
+          const withdrawalNum = parseFloat(withdrawalAmount);
+          const newBalance = userBalance - withdrawalNum;
+          setUserBalance(newBalance);
+          
+          // Update AsyncStorage
+          await AsyncStorage.setItem('userBalance', newBalance.toString());
 
-        // Deduct withdrawal amount from balance
-        setBalance((prevBalance) => prevBalance - parseFloat(withdrawalAmount));
+          // Add transaction
+          const newTransaction = {
+            id: Date.now().toString(),
+            amount: withdrawalAmount,
+            mpesaNumber: mpesaNumber,
+            time: new Date().toLocaleTimeString(),
+          };
+          setTransactions((prev) => [newTransaction, ...prev]);
 
-        // Add the transaction to the history
-        const newTransaction = {
-          id: Date.now().toString(), // Unique ID for the transaction
-          amount: withdrawalAmount,
-          mpesaNumber: mpesaNumber,
-          time: new Date().toLocaleTimeString(), // Current time
-        };
-        setTransactions((prevTransactions) => [newTransaction, ...prevTransactions]);
+          setIsLoading(false);
+          setIsModalVisible(true);
+        } catch (error) {
+          console.error('Error processing withdrawal:', error);
+          setIsLoading(false);
+        }
       }, 4000);
     }
   };
@@ -109,16 +133,14 @@ const WalletScreen = () => {
   // Close modal
   const closeModal = () => {
     setIsModalVisible(false);
-    // Reset fields after successful withdrawal
     setWithdrawalAmount('');
     setMpesaNumber('');
   };
 
   return (
     <ScrollView style={styles.container}>
-      {/* Balance Overview Section */}
       <LinearGradient
-        colors={['#5DB996', '#118B50']} // Gradient colors
+        colors={['#5DB996', '#118B50']}
         style={styles.balanceContainer}
       >
         <Text style={styles.username}>Hello, {username}</Text>
@@ -126,16 +148,15 @@ const WalletScreen = () => {
           <Icon name="wallet" size={30} color="#FBF6E9" style={styles.walletIcon} />
           <View>
             <Text style={styles.balanceLabel}>Your Balance</Text>
-            <Text style={styles.balanceAmount}>KSH {balance.toLocaleString()}</Text>
+            <Text style={styles.balanceAmount}>KSH {userBalance.toFixed(2)}</Text>
           </View>
         </View>
       </LinearGradient>
 
-      {/* Withdrawal Details Section */}
+      {/* ... rest of your existing JSX remains the same ... */}
+      
       <View style={styles.withdrawalContainer}>
         <Text style={styles.sectionTitle}>Withdrawal Details</Text>
-
-        {/* Amount Input */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>Amount (KSH)</Text>
           <TextInput
@@ -150,8 +171,6 @@ const WalletScreen = () => {
           />
           {amountError ? <Text style={styles.errorText}>{amountError}</Text> : null}
         </View>
-
-        {/* M-Pesa Number Input */}
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>M-Pesa Number</Text>
           <TextInput
@@ -166,14 +185,11 @@ const WalletScreen = () => {
           />
           {mpesaError ? <Text style={styles.errorText}>{mpesaError}</Text> : null}
         </View>
-
-        {/* Withdraw Button */}
         <TouchableOpacity style={styles.withdrawButton} onPress={handleWithdrawal}>
           <Text style={styles.withdrawButtonText}>Withdraw</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Transaction History Section */}
       <View style={styles.transactionsContainer}>
         <Text style={styles.sectionTitle}>Recent Transactions</Text>
         {transactions.length > 0 ? (
@@ -199,7 +215,6 @@ const WalletScreen = () => {
         )}
       </View>
 
-      {/* Loader */}
       {isLoading && (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#5DB996" />
@@ -207,7 +222,6 @@ const WalletScreen = () => {
         </View>
       )}
 
-      {/* Success Modal */}
       <Modal
         visible={isModalVisible}
         transparent={true}
@@ -249,7 +263,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   username: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#FBF6E9',
     fontFamily: 'Inter-Bold',
@@ -263,15 +277,15 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   balanceLabel: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#FBF6E9',
     fontFamily: 'Inter-Regular',
   },
   balanceAmount: {
-    fontSize: 32,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#FBF6E9',
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'Inter-Regular',
     marginTop: 5,
   },
   withdrawalContainer: {
@@ -286,7 +300,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#118B50',
     fontFamily: 'Inter-Bold',
@@ -305,7 +319,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FBF6E9',
     borderRadius: 5,
     padding: 10,
-    fontSize: 16,
+    fontSize: 14,
     color: '#118B50',
     fontFamily: 'Inter-Regular',
   },
@@ -323,7 +337,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   withdrawButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#FFFFFF',
     fontFamily: 'Inter-Bold',
   },
@@ -351,7 +365,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   transactionText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#118B50',
     fontFamily: 'Inter-Regular',
   },
@@ -367,7 +381,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   emptyStateText: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#118B50',
     marginTop: 10,

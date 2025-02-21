@@ -6,10 +6,19 @@ import { useFocusEffect } from '@react-navigation/native';
 import { db } from '../services/firebase';
 import { initialTasks, personalQuizzesTasks, healthWellnessTasks, generalKnowledgeTasks, moneySavingsTasks } from '../data/tasks';
 import quizData from '../data/quizData';
+import CircularProgress from 'react-native-circular-progress-indicator';
+
+
+const initializeTasksWithTimeLeft = (tasks) => {
+  return tasks.map(task => ({
+    ...task,
+    timeLeft: task.expiry - Date.now()
+  }));
+};
 
 
 const HomeScreen = ({ navigation }) => {
-  const [tasks, setTasks] = useState(initialTasks);
+  const [tasks, setTasks] = useState(initializeTasksWithTimeLeft(initialTasks));
   const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
   const [subscription, setSubscription] = useState('Basic');
@@ -20,13 +29,17 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
   const [quizModalVisible, setQuizModalVisible] = useState(false);
-  const [selectedTask, setSelectedTask] = useState(null); // To store the task clicked
+  const [selectedTask, setSelectedTask] = useState(null);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [answerFeedback, setAnswerFeedback] = useState(null);
   const [quizCompleted, setQuizCompleted] = useState(false);
+  const [userBalance, setUserBalance] = useState(0.00);
+  const [completedTasksToday, setCompletedTasksToday] = useState(0);
+  const [lastResetDate, setLastResetDate] = useState(null);
+  const [completedTaskIds, setCompletedTaskIds] = useState([]);
 
   useEffect(() => {
     const generateUserId = () => {
@@ -90,15 +103,83 @@ const HomeScreen = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
+    const loadBalance = async () => {
+      try {
+        const storedBalance = await AsyncStorage.getItem('userBalance');
+        setUserBalance(storedBalance ? parseFloat(storedBalance) : 0);
+      } catch (error) {
+        console.error('Error loading balance:', error);
+      }
+    };
+    loadBalance();
+  }, []);
+
+  useEffect(() => {
+    const loadTaskCount = async () => {
+      try {
+        const storedCount = await AsyncStorage.getItem('completedTasksToday');
+        const storedDate = await AsyncStorage.getItem('lastResetDate');
+        
+        const today = new Date().toDateString();
+        if (storedDate !== today) {
+          // Reset if it's a new day
+          setCompletedTasksToday(0);
+          setLastResetDate(today);
+          await AsyncStorage.setItem('completedTasksToday', '0');
+          await AsyncStorage.setItem('lastResetDate', today);
+        } else {
+          setCompletedTasksToday(storedCount ? parseInt(storedCount, 10) : 0);
+          setLastResetDate(storedDate);
+        }
+      } catch (error) {
+        console.error('Error loading task count:', error);
+      }
+    };
+    loadTaskCount();
+  }, []);
+
+  useEffect(() => {
+    const loadCompletedTasks = async () => {
+      try {
+        const storedCompleted = await AsyncStorage.getItem('completedTaskIds');
+        const storedDate = await AsyncStorage.getItem('lastResetDate');
+        
+        const today = new Date().toDateString();
+        if (storedDate !== today) {
+          setCompletedTaskIds([]);
+          setCompletedTasksToday(0);
+          setLastResetDate(today);
+          await AsyncStorage.multiSet([
+            ['completedTaskIds', JSON.stringify([])],
+            ['completedTasksToday', '0'],
+            ['lastResetDate', today]
+          ]);
+        } else {
+          setCompletedTaskIds(storedCompleted ? JSON.parse(storedCompleted) : []);
+          setCompletedTasksToday(parseInt(await AsyncStorage.getItem('completedTasksToday') || '0', 10));
+          setLastResetDate(storedDate);
+        }
+      } catch (error) {
+        console.error('Error loading completed tasks:', error);
+      }
+    };
+    loadCompletedTasks();
+  }, []);
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setTasks(prevTasks => prevTasks.map(task => {
-        const timeLeft = task.expiry - Date.now();
-        return { ...task, timeLeft };
+        // Only update timeLeft if the task isn't completed
+        if (!completedTaskIds.includes(task.id)) {
+          const timeLeft = task.expiry - Date.now();
+          return { ...task, timeLeft: Math.max(0, timeLeft) };
+        }
+        return task; // Return unchanged if completed
       }));
     }, 1000);
-
+  
     return () => clearInterval(interval);
-  }, []);
+  }, [completedTaskIds]);
 
   useEffect(() => {
     if (selectedTask) {
@@ -126,10 +207,10 @@ const HomeScreen = ({ navigation }) => {
     // Shuffle tasks
     const shuffledTasks = [...initialTasks].sort(() => Math.random() - 0.5);
     const shuffledStandardTasks = [
-      ...personalQuizzesTasks.slice(0, 1),
-      ...healthWellnessTasks.slice(0, 1),
-      ...generalKnowledgeTasks.slice(0, 1),
-      ...moneySavingsTasks.slice(0, 1),
+      ...personalQuizzesTasks.slice(0, 2),
+      ...healthWellnessTasks.slice(0, 2),
+      ...generalKnowledgeTasks.slice(0, 2),
+      ...moneySavingsTasks.slice(0, 2),
     ].sort(() => Math.random() - 0.5).map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
   
     setTasks(shuffledTasks);
@@ -138,18 +219,24 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const renderItem = ({ item }) => {
-    const hours = Math.floor(item.timeLeft / (1000 * 60 * 60));
-    const minutes = Math.floor((item.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((item.timeLeft % (1000 * 60)) / 1000);
-
-    // Check if the task is part of initialTasks using the category property
     const isInitialTask = item.category === 'initial';
-
+    const isCompleted = completedTaskIds.includes(item.id);
+    
+    // Only calculate time if task isn't completed
+    let hours = 0, minutes = 0, seconds = 0;
+    if (!isCompleted && item.timeLeft !== undefined) {
+      hours = Math.floor(item.timeLeft / (1000 * 60 * 60));
+      minutes = Math.floor((item.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+      seconds = Math.floor((item.timeLeft % (1000 * 60)) / 1000);
+    }
+  
     return (
       <View style={styles.taskContainer}>
         <Text style={styles.taskTitle}>{item.title}</Text>
         <Text style={styles.taskDescription}>{item.description}</Text>
-        <Text style={styles.expiryInfo}>Expires in {hours}h {minutes}m {seconds}s</Text>
+        <Text style={styles.expiryInfo}>
+          {isCompleted ? 'Task Completed' : `Expires in ${hours}h ${minutes}m ${seconds}s`}
+        </Text>
         <View style={styles.taskFooter}>
           <View style={styles.amountContainer}>
             <Icon name="cash" size={20} color="orange" />
@@ -162,12 +249,24 @@ const HomeScreen = ({ navigation }) => {
             </View>
           )}
           {isInitialTask ? (
-            <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
-            <Text style={styles.startButtonText}>Start Task</Text>
+            <TouchableOpacity 
+              style={[styles.startButton, isCompleted && styles.disabledButton]}
+              onPress={() => handleStartTask(item, isInitialTask)}
+              disabled={isCompleted}
+            >
+              <Text style={styles.startButtonText}>
+                {isCompleted ? '✓ Completed' : 'Start Task'}
+              </Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
-              <Text style={styles.subscribeButtonText}>Start Task</Text>
+            <TouchableOpacity 
+              style={[styles.subscribeButton, isCompleted && styles.disabledButton]}
+              onPress={() => setSubscriptionModalVisible(true)}
+              disabled={isCompleted}
+            >
+              <Text style={styles.subscribeButtonText}>
+                {isCompleted ? 'Completed' : 'Start Task'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -175,13 +274,37 @@ const HomeScreen = ({ navigation }) => {
     );
   };
 
+  // In your modal renderItem
+const modalRenderItem = ({ item }) => {
+  const isCompleted = completedTaskIds.includes(item.id);
+  return (
+    <View style={styles.taskContainer}>
+      {/* ... existing content ... */}
+      <TouchableOpacity 
+        style={[styles.startButton, isCompleted && styles.disabledButton]}
+        onPress={() => handleStartTask(item, isInitialTask)}
+        disabled={isCompleted}
+      >
+        <Text style={styles.startButtonText}>
+          {isCompleted ? 'Completed' : 'Start Task'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
   const handleStartTask = (item, isInitialTask) => {
+    if (completedTaskIds.includes(item.id)) {
+      setModalMessage('This task has already been completed today!');
+      setModalVisible(true);
+      return;
+    }
     if (subscription === 'Basic' && !isInitialTask) {
       setSubscriptionModalVisible(true);
     } else {
        // Fetch corresponding quiz from quizData.js based on item.category
        const selectedQuiz = quizData.find(q => q.category === item.category)?.questions || [];
-
+    setSelectedTask(item);
     setModalTasks(selectedQuiz); // Set the quiz data in modal state
     setModalMessage(item.title); // Set task title in modal
     setConfirmationModalVisible(true);
@@ -291,13 +414,66 @@ const HomeScreen = ({ navigation }) => {
   
     }
   };
+
+  const handleClaimEarnings = async () => {
+    if (!selectedTask?.amount || !selectedTask?.id) return;
+  
+    try {
+      if (completedTasksToday >= 3) {
+        setModalMessage('You have reached the daily limit of 3 completed tasks!');
+        setModalVisible(true);
+        setQuizModalVisible(false);
+        return;
+      }
+  
+      if (completedTaskIds.includes(selectedTask.id)) {
+        setModalMessage('This task has already been completed today!');
+        setModalVisible(true);
+        setQuizModalVisible(false);
+        return;
+      }
+  
+      // Update balance
+      const taskAmount = parseFloat(selectedTask.amount);
+      const newBalance = userBalance + taskAmount;
+      setUserBalance(newBalance);
+  
+      // Update completed tasks
+      const newCount = completedTasksToday + 1;
+      const newCompletedIds = [...completedTaskIds, selectedTask.id];
+      setCompletedTasksToday(newCount);
+      setCompletedTaskIds(newCompletedIds);
+  
+      // Persist all changes
+      await Promise.all([
+        AsyncStorage.setItem('userBalance', newBalance.toString()),
+        AsyncStorage.setItem('completedTasksToday', newCount.toString()),
+        AsyncStorage.setItem('completedTaskIds', JSON.stringify(newCompletedIds)),
+        AsyncStorage.setItem('lastResetDate', new Date().toDateString())
+      ]);
+  
+      // Reset quiz state and close modal
+      setQuizCompleted(false);
+      setCurrentQuestionIndex(0);
+      setSelectedOption(null);
+      setAnswerFeedback(null);
+      setQuizModalVisible(false);
+      
+      setModalMessage(`Successfully claimed KSH ${taskAmount}! New balance: KSH ${newBalance}`);
+      setModalVisible(true);
+    } catch (error) {
+      console.error('Error claiming earnings:', error);
+      setModalMessage('Error claiming earnings. Please try again.');
+      setModalVisible(true);
+    }
+  };
   
 
   const [standardTasks, setStandardTasks] = useState([
-    ...personalQuizzesTasks.slice(0, 1),
-    ...healthWellnessTasks.slice(0, 1),
-    ...generalKnowledgeTasks.slice(0, 1),
-    ...moneySavingsTasks.slice(0, 1),
+    ...personalQuizzesTasks.slice(0, 2),
+    ...healthWellnessTasks.slice(0, 2),
+    ...generalKnowledgeTasks.slice(0, 2),
+    ...moneySavingsTasks.slice(0, 2),
   ].map((task, index) => ({ ...task, id: `${task.category}-${index}` })));
 
   return (
@@ -308,7 +484,7 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.infoIcon}>
           <Icon name="person-circle" size={40} color="#E3F0AF" />
           <View style={styles.walletSection}>
-            <Text style={styles.walletBalance}> Balance: KSH 0.00</Text>
+            <Text style={styles.walletBalance}>Balance: KSH {userBalance.toFixed(2)}</Text>
           </View>
           <Icon name="notifications" size={30} color="#E3F0AF" style={styles.notificationIcon} />
         </View>
@@ -321,8 +497,7 @@ const HomeScreen = ({ navigation }) => {
 
           <View>
             <Text style={styles.username}>Completed Today</Text>
-            <Text style={styles.taskCount}>0 / 3 Tasks</Text>
-            
+            <Text style={styles.taskCount}>{completedTasksToday} / 3 Tasks</Text>
           </View>
 
         </View>
@@ -472,7 +647,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </Modal>
 
-      <Modal
+      <Modal 
   animationType="slide"
   transparent={true}
   visible={confirmationModalVisible}
@@ -480,7 +655,7 @@ const HomeScreen = ({ navigation }) => {
 >
   <View style={styles.modalContainer}>
     <View style={styles.modalQuizContent}>
-    <Image source={require("../assets/images/startTask.png")} style={styles.taskImage} />
+      <Image source={require("../assets/images/startTask.png")} style={styles.taskImage} />
       <Text style={styles.modalTitle}>Start Task</Text>
       <Text style={styles.modalText}>
         You are about to start the task:{"\n"}
@@ -492,24 +667,29 @@ const HomeScreen = ({ navigation }) => {
         2. Select the correct answer.{"\n"}
         3. Complete all questions to finish the task.
       </Text>
-      <TouchableOpacity
-          style={styles.proceedButton}
-          onPress={() => {
-            setIsLoading(true); // Show loader
+      
+      {/* Display the task amount */}
+      <Text style={styles.amountText}>Expected to Earn: KSH {selectedTask ? selectedTask.amount : "N/A"}</Text>
 
-            setTimeout(() => {
-              setIsLoading(false); // Hide loader
-              setConfirmationModalVisible(false); // Close confirmation modal
-              setQuizModalVisible(true); // Open quiz modal
-            }, 3000); // 3 seconds delay
-          }}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" size="small" /> // Loader while waiting
-          ) : (
-            <Text style={styles.proceedButtonText}>Proceed To Task</Text>
-          )}
-        </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.proceedButton}
+        onPress={() => {
+          setIsLoading(true); // Show loader
+
+          setTimeout(() => {
+            setIsLoading(false); // Hide loader
+            setConfirmationModalVisible(false); // Close confirmation modal
+            setQuizModalVisible(true); // Open quiz modal
+          }, 3000); // 3 seconds delay
+        }}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#fff" size="small" /> // Loader while waiting
+        ) : (
+          <Text style={styles.proceedButtonText}>Proceed To Task</Text>
+        )}
+      </TouchableOpacity>
+
       <TouchableOpacity
         style={styles.closeConfirm}
         onPress={() => setConfirmationModalVisible(false)}
@@ -524,13 +704,35 @@ const HomeScreen = ({ navigation }) => {
   animationType="fade"
   transparent={true}
   visible={quizModalVisible}
-  onRequestClose={() => setQuizModalVisible(false)}
 >
   <View style={styles.modalContainer}>
   
     <View style={styles.modalQuizContent}>
         {quizCompleted ? (
-      <Text style={styles.completionText}>QUIZ COMPLETED. EARNINGS ARE BEING CALCULATED.</Text>
+          <View style={styles.completionContainer}>
+          <CircularProgress
+            value={100} // Represents 100% completion
+            radius={90} // Size of the progress circle
+            duration={2000} // Animation duration in milliseconds
+            progressValueColor={'#5DB996'} // Green color for progress value
+            maxValue={100}
+            title={'Calculating'}
+            titleColor={'#333'}
+            titleStyle={{ fontSize: 12 }}
+            inActiveStrokeColor={'#E0E0E0'} // Grey inactive stroke
+            inActiveStrokeOpacity={0.5}
+            inActiveStrokeWidth={5}
+            activeStrokeColor={'#5DB996'} // Green active stroke
+            activeStrokeWidth={10}
+          />
+          <Text style={styles.completionText}>QUIZ COMPLETED. EARNINGS ARE BEING CALCULATED.</Text>
+          <Text style={styles.amountText}>You have earned: KSH {selectedTask ? selectedTask.amount : "N/A"}</Text>
+
+          <TouchableOpacity style={styles.claimButton} onPress={handleClaimEarnings}>
+            {/* Update userbalance using the selectedTask amount */}
+            <Text style={styles.claimButtonText}>Claim Earnings</Text>
+          </TouchableOpacity>
+        </View>
     ) : (
       <>
       <Text style={styles.quizTitle}>Task Time: {modalMessage}</Text>
@@ -919,7 +1121,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+
   proceedButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+  },
+  claimButton: {
+    backgroundColor: '#118B50',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  claimButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'Inter-Regular',
@@ -1026,14 +1243,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#888',
   },
+  completionContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
   completionText: {
-  fontSize: 18,
-  fontWeight: "bold",
-  textAlign: "center",
-  color: "green",
-  marginTop: 20,
-},
-
+    fontSize: 16,
+    color: '#5DB996',
+    marginTop: 15,
+    width: '100%',
+    textAlign: 'center',
+    fontFamily: 'Inter-Regular',
+  },
 });
 
 export default HomeScreen;
