@@ -1,24 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet,Image, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { db } from '../services/firebase';
-import { initialTasks, personalQuizzesTasks, healthWellnessTasks, generalKnowledgeTasks, moneySavingsTasks } from '../data/tasks';
+import { getInitialTasks, getPersonalQuizzesTasks, getHealthWellnessTasks, getGeneralKnowledgeTasks, getMoneySavingsTasks } from '../data/tasks'; // Updated imports
 import quizData from '../data/quizData';
 import CircularProgress from 'react-native-circular-progress-indicator';
 
-
 const initializeTasksWithTimeLeft = (tasks) => {
+  if (!Array.isArray(tasks)) {
+    console.error('tasks is not an array:', tasks);
+    return [];
+  }
   return tasks.map(task => ({
     ...task,
     timeLeft: task.expiry - Date.now()
   }));
 };
 
-
 const HomeScreen = ({ navigation }) => {
-  const [tasks, setTasks] = useState(initializeTasksWithTimeLeft(initialTasks));
+  const [tasks, setTasks] = useState([]); // Initialize as empty array
+  const [standardTasks, setStandardTasks] = useState([]); // Initialize as empty array
   const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
   const [subscription, setSubscription] = useState('Basic');
@@ -41,6 +44,37 @@ const HomeScreen = ({ navigation }) => {
   const [lastResetDate, setLastResetDate] = useState(null);
   const [completedTaskIds, setCompletedTaskIds] = useState([]);
 
+  // Fetch tasks from Firestore on mount
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const initial = await getInitialTasks();
+        console.log('Initial Tasks:', initial); // Debug log
+        setTasks(initializeTasksWithTimeLeft(initial));
+
+        const personal = await getPersonalQuizzesTasks();
+        const health = await getHealthWellnessTasks();
+        const general = await getGeneralKnowledgeTasks();
+        const money = await getMoneySavingsTasks();
+
+        // Ensure arrays are defined before slicing
+        const shuffledStandardTasks = [
+          ...(personal || []).slice(0, 2),
+          ...(health || []).slice(0, 2),
+          ...(general || []).slice(0, 2),
+          ...(money || []).slice(0, 2),
+        ].sort(() => Math.random() - 0.5).map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
+        setStandardTasks(shuffledStandardTasks);
+      } catch (error) {
+        console.error('Error fetching tasks:', error);
+        setTasks([]);
+        setStandardTasks([]);
+      }
+    };
+
+    fetchTasks();
+  }, []);
+
   useEffect(() => {
     const generateUserId = () => {
       const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -58,11 +92,11 @@ const HomeScreen = ({ navigation }) => {
           storedUserId = generateUserId();
           await AsyncStorage.setItem('userId', storedUserId);
         }
-          setUserId(storedUserId);
-        } catch (error) {
-          console.error('Error getting user ID: ', error);
-        }
-        };
+        setUserId(storedUserId);
+      } catch (error) {
+        console.error('Error getting user ID: ', error);
+      }
+    };
 
     getUserId();
   }, []);
@@ -71,16 +105,11 @@ const HomeScreen = ({ navigation }) => {
     const fetchUsername = async () => {
       try {
         const storedUsername = await AsyncStorage.getItem('username');
-          if (storedUsername) {
-            setUsername(storedUsername);
-          } else {
-            setUsername('User');
-          }
-        } catch (error) {
-          console.error('Error fetching username: ', error);
-        }
+        setUsername(storedUsername || 'User');
+      } catch (error) {
+        console.error('Error fetching username: ', error);
+      }
     };
-
     fetchUsername();
   }, []);
 
@@ -98,7 +127,6 @@ const HomeScreen = ({ navigation }) => {
         console.error('Error fetching subscription: ', error);
       }
     };
-
     fetchSubscription();
   }, []);
 
@@ -119,10 +147,8 @@ const HomeScreen = ({ navigation }) => {
       try {
         const storedCount = await AsyncStorage.getItem('completedTasksToday');
         const storedDate = await AsyncStorage.getItem('lastResetDate');
-        
         const today = new Date().toDateString();
         if (storedDate !== today) {
-          // Reset if it's a new day
           setCompletedTasksToday(0);
           setLastResetDate(today);
           await AsyncStorage.setItem('completedTasksToday', '0');
@@ -143,7 +169,6 @@ const HomeScreen = ({ navigation }) => {
       try {
         const storedCompleted = await AsyncStorage.getItem('completedTaskIds');
         const storedDate = await AsyncStorage.getItem('lastResetDate');
-        
         const today = new Date().toDateString();
         if (storedDate !== today) {
           setCompletedTaskIds([]);
@@ -169,15 +194,13 @@ const HomeScreen = ({ navigation }) => {
   useEffect(() => {
     const interval = setInterval(() => {
       setTasks(prevTasks => prevTasks.map(task => {
-        // Only update timeLeft if the task isn't completed
         if (!completedTaskIds.includes(task.id)) {
           const timeLeft = task.expiry - Date.now();
           return { ...task, timeLeft: Math.max(0, timeLeft) };
         }
-        return task; // Return unchanged if completed
+        return task;
       }));
     }, 1000);
-  
     return () => clearInterval(interval);
   }, [completedTaskIds]);
 
@@ -190,46 +213,56 @@ const HomeScreen = ({ navigation }) => {
 
   useFocusEffect(
     useCallback(() => {
-      // Reset or update state when the screen comes into focus
       const fetchTasks = async () => {
-        // Fetch tasks or reset state here if needed
-        setTasks(initialTasks);
+        try {
+          const initial = await getInitialTasks();
+          setTasks(initializeTasksWithTimeLeft(initial));
+        } catch (error) {
+          console.error('Error fetching tasks on focus:', error);
+          setTasks([]);
+        }
       };
-
       fetchTasks();
     }, [])
   );
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
+    try {
+      const initial = await getInitialTasks();
+      const shuffledTasks = initializeTasksWithTimeLeft(initial).sort(() => Math.random() - 0.5);
+      setTasks(shuffledTasks);
 
-    
-    // Shuffle tasks
-    const shuffledTasks = [...initialTasks].sort(() => Math.random() - 0.5);
-    const shuffledStandardTasks = [
-      ...personalQuizzesTasks.slice(0, 2),
-      ...healthWellnessTasks.slice(0, 2),
-      ...generalKnowledgeTasks.slice(0, 2),
-      ...moneySavingsTasks.slice(0, 2),
-    ].sort(() => Math.random() - 0.5).map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
-  
-    setTasks(shuffledTasks);
-    setStandardTasks(shuffledStandardTasks); // <-- Now this works
+      const personal = await getPersonalQuizzesTasks();
+      const health = await getHealthWellnessTasks();
+      const general = await getGeneralKnowledgeTasks();
+      const money = await getMoneySavingsTasks();
+
+      const shuffledStandardTasks = [
+        ...(personal || []).slice(0, 2),
+        ...(health || []).slice(0, 2),
+        ...(general || []).slice(0, 2),
+        ...(money || []).slice(0, 2),
+      ].sort(() => Math.random() - 0.5).map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
+      setStandardTasks(shuffledStandardTasks);
+    } catch (error) {
+      console.error('Error refreshing tasks:', error);
+      setTasks([]);
+      setStandardTasks([]);
+    }
     setRefreshing(false);
   };
 
   const renderItem = ({ item }) => {
     const isInitialTask = item.category === 'initial';
     const isCompleted = completedTaskIds.includes(item.id);
-    
-    // Only calculate time if task isn't completed
     let hours = 0, minutes = 0, seconds = 0;
     if (!isCompleted && item.timeLeft !== undefined) {
       hours = Math.floor(item.timeLeft / (1000 * 60 * 60));
       minutes = Math.floor((item.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
       seconds = Math.floor((item.timeLeft % (1000 * 60)) / 1000);
     }
-  
+
     return (
       <View style={styles.taskContainer}>
         <Text style={styles.taskTitle}>{item.title}</Text>
@@ -249,7 +282,7 @@ const HomeScreen = ({ navigation }) => {
             </View>
           )}
           {isInitialTask ? (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.startButton, isCompleted && styles.disabledButton]}
               onPress={() => handleStartTask(item, isInitialTask)}
               disabled={isCompleted}
@@ -259,7 +292,7 @@ const HomeScreen = ({ navigation }) => {
               </Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.subscribeButton, isCompleted && styles.disabledButton]}
               onPress={() => setSubscriptionModalVisible(true)}
               disabled={isCompleted}
@@ -274,25 +307,6 @@ const HomeScreen = ({ navigation }) => {
     );
   };
 
-  // In your modal renderItem
-const modalRenderItem = ({ item }) => {
-  const isCompleted = completedTaskIds.includes(item.id);
-  return (
-    <View style={styles.taskContainer}>
-      {/* ... existing content ... */}
-      <TouchableOpacity 
-        style={[styles.startButton, isCompleted && styles.disabledButton]}
-        onPress={() => handleStartTask(item, isInitialTask)}
-        disabled={isCompleted}
-      >
-        <Text style={styles.startButtonText}>
-          {isCompleted ? 'Completed' : 'Start Task'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
-
   const handleStartTask = (item, isInitialTask) => {
     if (completedTaskIds.includes(item.id)) {
       setModalMessage('This task has already been completed today!');
@@ -302,12 +316,11 @@ const modalRenderItem = ({ item }) => {
     if (subscription === 'Basic' && !isInitialTask) {
       setSubscriptionModalVisible(true);
     } else {
-       // Fetch corresponding quiz from quizData.js based on item.category
-       const selectedQuiz = quizData.find(q => q.category === item.category)?.questions || [];
-    setSelectedTask(item);
-    setModalTasks(selectedQuiz); // Set the quiz data in modal state
-    setModalMessage(item.title); // Set task title in modal
-    setConfirmationModalVisible(true);
+      const selectedQuiz = quizData.find(q => q.category === item.category)?.questions || [];
+      setSelectedTask(item);
+      setModalTasks(selectedQuiz);
+      setModalMessage(item.title);
+      setConfirmationModalVisible(true);
     }
   };
 
@@ -330,20 +343,16 @@ const modalRenderItem = ({ item }) => {
   const navigateToDiscover = () => {
     closeSubscriptionModal();
     navigation.navigate('Discover');
-    
   };
-
 
   const handleOptionSelect = (optionText) => {
-    setSelectedOption(optionText); // Store the text of the selected option
-    setAnswerFeedback(null); // Reset feedback when a new option is selected
+    setSelectedOption(optionText);
+    setAnswerFeedback(null);
   };
 
-  // Filter quiz data based on the selected category (modalMessage)
   const filteredQuizData = quizData.filter(item => item.category === modalMessage);
   const questions = filteredQuizData.length > 0 ? filteredQuizData[0].questions : [];
 
-  // Handle navigation
   const handleNext = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -355,42 +364,35 @@ const modalRenderItem = ({ item }) => {
       setAnswerFeedback('Please select an option.');
       return;
     }
-  
-    // Get the correct answer for the current question
     const correctAnswer = questions[currentQuestionIndex].correctAnswer;
-  
     console.log("Selected Option:", selectedOption);
     console.log("Correct Answer:", correctAnswer);
     console.log("Comparison Result:", selectedOption === correctAnswer);
-  
     if (selectedOption === correctAnswer) {
       setAnswerFeedback('✅ Correct Answer!');
     } else {
       setAnswerFeedback('❌ Wrong Answer, Try Again');
     }
-  
     setTimeout(() => {
       if (selectedOption === correctAnswer) {
         if (currentQuestionIndex < questions.length - 1) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
-          setSelectedOption(null); // Reset selection for the next question
-          setAnswerFeedback(null); // Reset feedback
+          setSelectedOption(null);
+          setAnswerFeedback(null);
         } else {
           setAnswerFeedback("🎉 Quiz Completed! You've earned rewards.");
-          // Optionally, close the quiz modal or reset the quiz state
           setTimeout(() => {
             setQuizModalVisible(false);
-            setCurrentQuestionIndex(0); // Reset to the first question
-            setSelectedOption(null); // Reset selection
-            setAnswerFeedback(null); // Reset feedback
-          }, 2000); // Close the modal after 2 seconds
+            setCurrentQuestionIndex(0);
+            setSelectedOption(null);
+            setAnswerFeedback(null);
+          }, 2000);
         }
       } else {
-        setSelectedOption(null); // Reset selection for retry
+        setSelectedOption(null);
       }
     }, 1000);
   };
-
 
   const handlePrevious = () => {
     if (currentQuestionIndex > 0) {
@@ -401,8 +403,8 @@ const modalRenderItem = ({ item }) => {
   useEffect(() => {
     if (quizModalVisible) {
       setQuizCompleted(false);
-      setCurrentQuestionIndex(0); // Reset the quiz to the first question
-      setSelectedOption(null); // Reset the selected option
+      setCurrentQuestionIndex(0);
+      setSelectedOption(null);
     }
   }, [quizModalVisible]);
 
@@ -411,13 +413,11 @@ const modalRenderItem = ({ item }) => {
       handleOptionSelect(selectedOption);
       setQuizCompleted(true);
       console.log("Submitting last selection:", selectedOption);
-  
     }
   };
 
   const handleClaimEarnings = async () => {
     if (!selectedTask?.amount || !selectedTask?.id) return;
-  
     try {
       if (completedTasksToday >= 3) {
         setModalMessage('You have reached the daily limit of 3 completed tasks!');
@@ -425,40 +425,30 @@ const modalRenderItem = ({ item }) => {
         setQuizModalVisible(false);
         return;
       }
-  
       if (completedTaskIds.includes(selectedTask.id)) {
         setModalMessage('This task has already been completed today!');
         setModalVisible(true);
         setQuizModalVisible(false);
         return;
       }
-  
-      // Update balance
       const taskAmount = parseFloat(selectedTask.amount);
       const newBalance = userBalance + taskAmount;
       setUserBalance(newBalance);
-  
-      // Update completed tasks
       const newCount = completedTasksToday + 1;
       const newCompletedIds = [...completedTaskIds, selectedTask.id];
       setCompletedTasksToday(newCount);
       setCompletedTaskIds(newCompletedIds);
-  
-      // Persist all changes
       await Promise.all([
         AsyncStorage.setItem('userBalance', newBalance.toString()),
         AsyncStorage.setItem('completedTasksToday', newCount.toString()),
         AsyncStorage.setItem('completedTaskIds', JSON.stringify(newCompletedIds)),
         AsyncStorage.setItem('lastResetDate', new Date().toDateString())
       ]);
-  
-      // Reset quiz state and close modal
       setQuizCompleted(false);
       setCurrentQuestionIndex(0);
       setSelectedOption(null);
       setAnswerFeedback(null);
       setQuizModalVisible(false);
-      
       setModalMessage(`Successfully claimed KSH ${taskAmount}! New balance: KSH ${newBalance}`);
       setModalVisible(true);
     } catch (error) {
@@ -469,12 +459,6 @@ const modalRenderItem = ({ item }) => {
   };
   
 
-  const [standardTasks, setStandardTasks] = useState([
-    ...personalQuizzesTasks.slice(0, 2),
-    ...healthWellnessTasks.slice(0, 2),
-    ...generalKnowledgeTasks.slice(0, 2),
-    ...moneySavingsTasks.slice(0, 2),
-  ].map((task, index) => ({ ...task, id: `${task.category}-${index}` })));
 
   return (
     <ScrollView style={styles.container} refreshControl={
@@ -494,12 +478,10 @@ const modalRenderItem = ({ item }) => {
             <Text style={styles.userId}>ID: {userId}</Text>
             <Text style={styles.subscription}>Subscription: {subscription}</Text>
           </View>
-
           <View>
             <Text style={styles.username}>Completed Today</Text>
             <Text style={styles.taskCount}>{completedTasksToday} / 3 Tasks</Text>
           </View>
-
         </View>
       </View>
       <View style={styles.homeContent}>
@@ -510,16 +492,16 @@ const modalRenderItem = ({ item }) => {
               <Icon name="checkmark-circle" size={20} color="#FBF6E9" />
               <Text style={styles.topicButtonText}>Available</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButtonStandard} onPress={() => showModal('Personal Quizzes', personalQuizzesTasks)}>
+            <TouchableOpacity style={styles.topicButtonStandard} onPress={async () => showModal('Personal Quizzes', await getPersonalQuizzesTasks())}>
               <Text style={styles.topicButtonText}>Personal Quizzes</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButtonStandard} onPress={() => showModal('Health & Wellness', healthWellnessTasks)}>
+            <TouchableOpacity style={styles.topicButtonStandard} onPress={async () => showModal('Health & Wellness', await getHealthWellnessTasks())}>
               <Text style={styles.topicButtonText}>Health & Wellness</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButtonStandard} onPress={() => showModal('General Knowledge', generalKnowledgeTasks)}>
+            <TouchableOpacity style={styles.topicButtonStandard} onPress={async () => showModal('General Knowledge', await getGeneralKnowledgeTasks())}>
               <Text style={styles.topicButtonText}>General Knowledge</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.topicButtonStandard} onPress={() => showModal('Money & Savings', moneySavingsTasks)}>
+            <TouchableOpacity style={styles.topicButtonStandard} onPress={async () => showModal('Money & Savings', await getMoneySavingsTasks())}>
               <Text style={styles.topicButtonText}>Money & Savings</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -529,7 +511,7 @@ const modalRenderItem = ({ item }) => {
           <Icon name="star" size={20} color="orange" style={styles.medalIcon} />
         </View>
         <View style={styles.taskItems}>
-          <Text style={styles.subtitle}>Your Tasks [3] </Text>
+          <Text style={styles.subtitle}>Your Tasks [3]</Text>
         </View>
         <FlatList
           data={tasks}
@@ -539,41 +521,40 @@ const modalRenderItem = ({ item }) => {
         />
         <Text style={styles.title}>Standard Tasks</Text>
         <FlatList
-        data={standardTasks}
-        renderItem={({ item }) => {
-          const isInitialTask = item.category === 'initial';
-
-    return (
-      <View style={styles.taskContainer}>
-        <Text style={styles.taskTitle}>{item.title}</Text>
-        {!isInitialTask && (
-          <View style={styles.premiumContainer}>
-            <Icon name="diamond" size={20} color="orange" />
-            <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
-          </View>
-        )}
-        <Text style={styles.taskDescription}>{item.description}</Text>
-        <View style={styles.taskFooter}>
-          <View style={styles.amountContainer}>
-            <Icon name="cash" size={20} color="orange" />
-            <Text style={styles.amountText}>KSH {item.amount}</Text>
-          </View>
-          {isInitialTask ? (
-            <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
-              <Text style={styles.startButtonText}>Start Task</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
-              <Text style={styles.subscribeButtonText}>Start Task</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    );
-  }}
-  keyExtractor={(item, index) => `${item.category}-${index}`}
-  contentContainerStyle={styles.taskList}
-/>
+          data={standardTasks}
+          renderItem={({ item }) => {
+            const isInitialTask = item.category === 'initial';
+            return (
+              <View style={styles.taskContainer}>
+                <Text style={styles.taskTitle}>{item.title}</Text>
+                {!isInitialTask && (
+                  <View style={styles.premiumContainer}>
+                    <Icon name="diamond" size={20} color="orange" />
+                    <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
+                  </View>
+                )}
+                <Text style={styles.taskDescription}>{item.description}</Text>
+                <View style={styles.taskFooter}>
+                  <View style={styles.amountContainer}>
+                    <Icon name="cash" size={20} color="orange" />
+                    <Text style={styles.amountText}>KSH {item.amount}</Text>
+                  </View>
+                  {isInitialTask ? (
+                    <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
+                      <Text style={styles.startButtonText}>Start Task</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
+                      <Text style={styles.subscribeButtonText}>Start Task</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            );
+          }}
+          keyExtractor={(item, index) => `${item.category}-${index}`}
+          contentContainerStyle={styles.taskList}
+        />
       </View>
       <Modal
         animationType="slide"

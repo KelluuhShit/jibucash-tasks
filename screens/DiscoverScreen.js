@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Easing, Modal, TextInput, Alert, Image  } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Easing, Modal, TextInput, Alert, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Icon from 'react-native-vector-icons/Ionicons'; // Import Ionicons
+import Icon from 'react-native-vector-icons/Ionicons';
 
 const DiscoverScreen = () => {
-  // Animation for shiny effect
   const shineAnim = new Animated.Value(0);
   const shakeAnim = new Animated.Value(0);
   const [username, setUsername] = useState('');
@@ -21,16 +20,11 @@ const DiscoverScreen = () => {
     const fetchUsername = async () => {
       try {
         const storedUsername = await AsyncStorage.getItem('username');
-        if (storedUsername) {
-          setUsername(storedUsername);
-        } else {
-          setUsername('User');
-        }
+        setUsername(storedUsername || 'User');
       } catch (error) {
         console.error('Error fetching username: ', error);
       }
     };
-
     fetchUsername();
   }, []);
 
@@ -134,16 +128,18 @@ const DiscoverScreen = () => {
           ))}
         </View>
         {level !== 'Basic' && (
-        <TouchableOpacity
-          style={styles.subButton}
-          onPress={() => {
-            setModalContent({ title, description, offersArray, price, iconName });
-            setModalVisible(true);
-          }}
-        >
-          <Text style={styles.subButtonText}>{subButton}</Text>
-        </TouchableOpacity>
-      )}
+          <TouchableOpacity
+            style={styles.subButton}
+            onPress={() => {
+              // Remove "KSH " prefix and convert price to a number
+              const priceValue = parseFloat(price.replace('KSH ', ''));
+              setModalContent({ title, description, offersArray, price: priceValue, iconName });
+              setModalVisible(true);
+            }}
+          >
+            <Text style={styles.subButtonText}>{subButton}</Text>
+          </TouchableOpacity>
+        )}
       </TouchableOpacity>
     );
   };
@@ -167,12 +163,14 @@ const DiscoverScreen = () => {
     }
   };
 
-
   const validateMpesaMessage = () => {
-    const priceString = modalContent.price.toString(); // Convert price to string
+    // Convert price to an integer
+    const priceInteger = parseInt(modalContent.price, 10);
+    // Format as integer or with .00 (e.g., "350" or "350.00")
+    const priceString = Number.isInteger(Number(modalContent.price)) ? priceInteger.toString() : `${priceInteger}.00`;
+
     if (!mpesaMessage) {
       setMpesaErrorMessage('Please paste the MPESA message to continue');
-      
     } else if (!mpesaMessage.includes(priceString) || !mpesaMessage.includes('paid to FANAKA SOLUTIONS')) {
       setMpesaErrorMessage('Please make the payment and try again');
     } else {
@@ -190,55 +188,52 @@ const DiscoverScreen = () => {
         <Text style={styles.subtitle}>Unlock more features and rewards by upgrading today!</Text>
         <Text style={styles.callToAction}>Join thousands of happy users who've upgraded to Standard, Premium, or Elite!</Text>
 
-        {renderCard('Basic', 'Basic', 'Enjoy basic features with limited access.', '✔️ Free Daily Three Tasks. ✔️ Earn Upto KSH 10 Daily. ✔️ Tasks Expires After 24 Hours. ✔️ No Instant Withdrawals . ','Free', 'checkmark-circle','Subscribed')}
-        {renderCard('Standard', 'Standard', 'Unlock more features and higher rewards.', '✔️ Enjoy Upto Fifteen Daily Tasks. ✔️ Earn Upto KSH 3,000 Daily. ✔️ Earn KSH 99 Per Video Watched. ✔️ Withdraw Earnings Instantly.', 'KSH 350', 'star-half','Subscribe Now')}
-        {renderCard('Premium', 'Premium', 'Get premium features and even higher rewards.', '✔️ Enjoy Infinite Tasks. ✔️ Earn Upto KSH 5,000 Daily. ✔️ Refer a New User and Earn KSH 500. ✔️ Earn KSH 200 Per CAPTCHA Solved. ✔️ Withdraw Earnings Instantly.', 'KSH 700', 'star','Subscribe Now')}
-        {renderCard('Elite', 'Elite', 'Access all features with the highest rewards.', '✔️ Perfom Virtual Assistant Tasks. ✔️ Earn KSH 999 Per Transcription Task. ✔️ Receive Support and Training. ✔️ Get Paid To Train New Users. ✔️ Create Team and Earn Commission.', 'KSH 1,000', 'trophy','Subscribe Now')}
+        {renderCard('Basic', 'Basic', 'Enjoy basic features with limited access.', '✔️ Free Daily Three Tasks. ✔️ Earn Upto KSH 10 Daily. ✔️ Tasks Expires After 24 Hours. ✔️ No Instant Withdrawals . ', 'Free', 'checkmark-circle', 'Subscribed')}
+        {renderCard('Standard', 'Standard', 'Unlock more features and higher rewards.', '✔️ Enjoy Upto Fifteen Daily Tasks. ✔️ Earn Upto KSH 3,000 Daily. ✔️ Earn KSH 99 Per Video Watched. ✔️ Withdraw Earnings Instantly.', 'KSH 350', 'star-half', 'Subscribe Now')}
+        {renderCard('Premium', 'Premium', 'Get premium features and even higher rewards.', '✔️ Enjoy Infinite Tasks. ✔️ Earn Upto KSH 5,000 Daily. ✔️ Refer a New User and Earn KSH 500. ✔️ Earn KSH 200 Per CAPTCHA Solved. ✔️ Withdraw Earnings Instantly.', 'KSH 700', 'star', 'Subscribe Now')}
+        {renderCard('Elite', 'Elite', 'Access all features with the highest rewards.', '✔️ Perfom Virtual Assistant Tasks. ✔️ Earn KSH 999 Per Transcription Task. ✔️ Receive Support and Training. ✔️ Get Paid To Train New Users. ✔️ Create Team and Earn Commission.', 'KSH 1,000', 'trophy', 'Subscribe Now')}
       </ScrollView>
 
       <Modal
         animationType="slide"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => {
-          setModalVisible(!modalVisible);
-        }}
+        onRequestClose={() => setModalVisible(!modalVisible)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-          <ScrollView contentContainerStyle={styles.modalScrollContainer}>
-            <View style={styles.modalIcon}>
-            <Icon name={modalContent.iconName} size={100} color="orange" style={styles.cardIcon} />
-            </View>
-            <Text style={styles.modalTitle}>{modalContent.title}</Text>
-            <Text style={styles.modalDescription}>{modalContent.description}</Text>
-            <View style={styles.modalOffersContainer}>
-              {modalContent.offersArray && modalContent.offersArray.map((offer, index) => (
-                <View key={index} style={styles.modalOfferItem}>
-                  <Icon name="checkmark-circle" size={20} color="#118B50" />
-                  <Text style={styles.modalOfferText}>{offer.trim()}</Text>
-                </View>
-              ))}
-            </View>
-            <Text style={styles.modalPrice}>{modalContent.price}</Text>
-            <TextInput
-              style={styles.phoneInput}
-              placeholder="Enter phone number"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              keyboardType="phone-pad"
-            />
-            {errorMessage ? <Text style={[styles.errorText, errorMessage === 'Processing...' && styles.processingText]}>{errorMessage}</Text> : null}
-            <TouchableOpacity style={styles.initiateButton} onPress={validatePhoneNumber}>
-              <Text style={styles.initButtonText}>Initiante Payment</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-            
+            <ScrollView contentContainerStyle={styles.modalScrollContainer}>
+              <View style={styles.modalIcon}>
+                <Icon name={modalContent.iconName} size={100} color="orange" style={styles.cardIcon} />
+              </View>
+              <Text style={styles.modalTitle}>{modalContent.title}</Text>
+              <Text style={styles.modalDescription}>{modalContent.description}</Text>
+              <View style={styles.modalOffersContainer}>
+                {modalContent.offersArray && modalContent.offersArray.map((offer, index) => (
+                  <View key={index} style={styles.modalOfferItem}>
+                    <Icon name="checkmark-circle" size={20} color="#118B50" />
+                    <Text style={styles.modalOfferText}>{offer.trim()}</Text>
+                  </View>
+                ))}
+              </View>
+              <Text style={styles.modalPrice}>KSH {modalContent.price}</Text>
+              <TextInput
+                style={styles.phoneInput}
+                placeholder="Enter phone number"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                keyboardType="phone-pad"
+              />
+              {errorMessage ? <Text style={[styles.errorText, errorMessage === 'Processing...' && styles.processingText]}>{errorMessage}</Text> : null}
+              <TouchableOpacity style={styles.initiateButton} onPress={validatePhoneNumber}>
+                <Text style={styles.initButtonText}>Initiate Payment</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
@@ -248,25 +243,23 @@ const DiscoverScreen = () => {
         animationType="slide"
         transparent={true}
         visible={manualModalVisible}
-        onRequestClose={() => {
-          setManualModalVisible(!manualModalVisible);
-        }}
+        onRequestClose={() => setManualModalVisible(!manualModalVisible)}
       >
-      <View style={styles.modalContainer}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <ScrollView contentContainerStyle={styles.modalScrollContainer}>
               <View style={styles.tillContainer}>
-              <Image source={require('../assets/images/tillNumber.png')} style={styles.tillNumberImage} />
+                <Image source={require('../assets/images/tillNumber.png')} style={styles.tillNumberImage} />
               </View>
-              <Text style={styles.modalManualPrice}>To Process and Complete your Subscription, Pay {modalContent.price} to FANAKA SOLUTIONS and Paste Your Message Below and Click Confirm Payment</Text>
+              <Text style={styles.modalManualPrice}>To Process and Complete your Subscription, Pay KSH {modalContent.price} to FANAKA SOLUTIONS and Paste Your Message Below and Click Confirm Payment</Text>
               <TextInput
-                  style={styles.pasteInput}
-                  placeholder="Paste your MPESA message here..."
-                  value={mpesaMessage}
-                  onChangeText={setMpesaMessage}
-                  multiline={true}
-                  scrollEnabled={false}
-                />
+                style={styles.pasteInput}
+                placeholder="Paste your MPESA message here..."
+                value={mpesaMessage}
+                onChangeText={setMpesaMessage}
+                multiline={true}
+                scrollEnabled={false}
+              />
               {mpesaErrorMessage ? <Text style={styles.errorText}>{mpesaErrorMessage}</Text> : null}
               <TouchableOpacity style={styles.initiateButton} onPress={validateMpesaMessage}>
                 <Text style={styles.initButtonText}>Confirm Payment</Text>
