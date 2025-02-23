@@ -1,6 +1,12 @@
-const quizData = [
+import { db } from '../services/firebase';
+import { collection, getDocs, setDoc, doc } from 'firebase/firestore';
+
+// Function to initialize quiz data in Firestore
+const initializeQuizDataInFirestore = async () => {
+  const quizData = [
     {
-      id: '1',category: "Monetizing Social Media",
+      id: '1',
+      category: "Monetizing Social Media",
       questions: [
         {
           question: "What is one of the most common ways to earn money on Instagram?",
@@ -69,7 +75,8 @@ const quizData = [
       ],
     },
     {
-      id: '2',category: "Affiliate Marketing Basics",
+      id: '2',
+      category: "Affiliate Marketing Basics",
       questions: [
         {
           question: "What is affiliate marketing?",
@@ -138,7 +145,8 @@ const quizData = [
       ],
     },
     {
-      id: '3', category: "Avoiding Online Scams",
+      id: '3',
+      category: "Avoiding Online Scams",
       questions: [
         {
           question: "What is a common sign of an online scam?",
@@ -165,8 +173,7 @@ const quizData = [
             "A way to catch fish online",
             "A new social media trend",
           ],
-          correctAnswer:
-            "A method scammers use to steal personal information through fake emails and messages",
+          correctAnswer: "A method scammers use to steal personal information through fake emails and messages",
         },
         {
           question: "What is the safest way to pay for an online purchase?",
@@ -216,6 +223,58 @@ const quizData = [
       ],
     },
   ];
-  
-  export default quizData;
-  
+
+  try {
+    console.log('Initializing quiz data in Firestore...');
+    for (const quiz of quizData) {
+      await setDoc(doc(db, 'quizzes', quiz.id), quiz);
+      console.log(`Initialized quiz: ${quiz.category}`);
+    }
+    console.log('All quiz data initialized in Firestore successfully');
+  } catch (error) {
+    console.error('Error initializing quiz data in Firestore:', error);
+    throw error; // Throw error to catch in caller
+  }
+};
+
+// Function to check if the 'quizzes' collection is empty
+const isQuizCollectionEmpty = async () => {
+  const querySnapshot = await getDocs(collection(db, 'quizzes'));
+  return querySnapshot.empty;
+};
+
+// Function to fetch quiz data from Firestore, initializing if empty
+const fetchQuizDataFromFirestore = async () => {
+  try {
+    if (!db) {
+      console.error('Firestore db is not initialized');
+      return [];
+    }
+
+    const empty = await isQuizCollectionEmpty();
+    if (empty) {
+      console.log('Quizzes collection is empty, initializing quiz data...');
+      await initializeQuizDataInFirestore();
+    }
+
+    const querySnapshot = await getDocs(collection(db, 'quizzes'));
+    if (querySnapshot.empty) {
+      console.warn('No documents found in quizzes collection after initialization');
+      return [];
+    }
+
+    const quizzes = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    console.log('Fetched quiz data from Firestore:', quizzes);
+    return quizzes;
+  } catch (error) {
+    console.error('Error fetching quiz data from Firestore:', error);
+    return [];
+  }
+};
+
+// Export the fetch function
+export default fetchQuizDataFromFirestore;

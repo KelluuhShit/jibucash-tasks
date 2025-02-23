@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { db } from '../services/firebase';
 import { getInitialTasks, getPersonalQuizzesTasks, getHealthWellnessTasks, getGeneralKnowledgeTasks, getMoneySavingsTasks } from '../data/tasks'; // Updated imports
-import quizData from '../data/quizData';
+import fetchQuizDataFromFirestore from '../data/quizData';
 import CircularProgress from 'react-native-circular-progress-indicator';
 
 const initializeTasksWithTimeLeft = (tasks) => {
@@ -43,13 +43,14 @@ const HomeScreen = ({ navigation }) => {
   const [completedTasksToday, setCompletedTasksToday] = useState(0);
   const [lastResetDate, setLastResetDate] = useState(null);
   const [completedTaskIds, setCompletedTaskIds] = useState([]);
+  const [quizData, setQuizData] = useState([]);
 
   // Fetch tasks from Firestore on mount
   useEffect(() => {
-    const fetchTasks = async () => {
+    const fetchData = async () => {
       try {
         const initial = await getInitialTasks();
-        console.log('Initial Tasks:', initial); // Debug log
+        console.log('Initial Tasks:', initial);
         setTasks(initializeTasksWithTimeLeft(initial));
 
         const personal = await getPersonalQuizzesTasks();
@@ -57,7 +58,6 @@ const HomeScreen = ({ navigation }) => {
         const general = await getGeneralKnowledgeTasks();
         const money = await getMoneySavingsTasks();
 
-        // Ensure arrays are defined before slicing
         const shuffledStandardTasks = [
           ...(personal || []).slice(0, 2),
           ...(health || []).slice(0, 2),
@@ -65,14 +65,19 @@ const HomeScreen = ({ navigation }) => {
           ...(money || []).slice(0, 2),
         ].sort(() => Math.random() - 0.5).map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
         setStandardTasks(shuffledStandardTasks);
+
+        const quizzes = await fetchQuizDataFromFirestore(); // Fetch quiz data
+        console.log('Quiz Data:', quizzes);
+        setQuizData(quizzes); // Set quiz data state
       } catch (error) {
-        console.error('Error fetching tasks:', error);
+        console.error('Error fetching data:', error);
         setTasks([]);
         setStandardTasks([]);
+        setQuizData([]);
       }
     };
 
-    fetchTasks();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -262,6 +267,9 @@ const HomeScreen = ({ navigation }) => {
       minutes = Math.floor((item.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
       seconds = Math.floor((item.timeLeft % (1000 * 60)) / 1000);
     }
+
+    const filteredQuizData = quizData.filter(item => item.category === modalMessage);
+    const questions = filteredQuizData.length > 0 ? filteredQuizData[0].questions : [];
 
     return (
       <View style={styles.taskContainer}>

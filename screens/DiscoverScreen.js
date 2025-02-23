@@ -10,6 +10,7 @@ const DiscoverScreen = () => {
   const [username, setUsername] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [manualModalVisible, setManualModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [modalContent, setModalContent] = useState({});
   const [phoneNumber, setPhoneNumber] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -175,10 +176,14 @@ const DiscoverScreen = () => {
       setMpesaErrorMessage('Please make the payment and try again');
     } else {
       setMpesaErrorMessage('');
-      Alert.alert('Success', 'Payment confirmed successfully');
+      setSuccessModalVisible(true); // Show success modal instead of Alert
       setManualModalVisible(false);
       setModalVisible(false);
     }
+  };
+
+  const closeSuccessModal = () => {
+    setSuccessModalVisible(false);
   };
 
   return (
@@ -272,6 +277,27 @@ const DiscoverScreen = () => {
               </TouchableOpacity>
             </ScrollView>
           </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={successModalVisible}
+        onRequestClose={closeSuccessModal}
+      >
+        <View style={styles.successModalContainer}>
+          <LinearGradient
+            colors={['#5DB996', '#118B50']}
+            style={styles.successModalContent}
+          >
+            <Icon name="checkmark-circle" size={60} color="#FBF6E9" style={styles.successIcon} />
+            <Text style={styles.successTitle}>Payment Successful!</Text>
+            <Text style={styles.successMessage}>Your payment of KSH {modalContent.price} has been confirmed.</Text>
+            <TouchableOpacity style={styles.successButton} onPress={closeSuccessModal}>
+              <Text style={styles.successButtonText}>OK</Text>
+            </TouchableOpacity>
+          </LinearGradient>
         </View>
       </Modal>
     </View>
@@ -394,7 +420,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 3, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
-    elevation: 5, // For Android shadow
+    elevation: 5,
   },
   subButtonText: {
     color: 'white',
@@ -476,7 +502,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     height: 100,
     textAlignVertical: 'top',
-    overflow: 'hidden', // Ensures wrapping instead of scrolling
+    overflow: 'hidden',
     multiline: true,
     scrollEnabled: false,
   },
@@ -498,7 +524,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 3, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
-    elevation: 5, // For Android shadow
+    elevation: 5,
     backgroundColor: 'white',
     width:'100%',
   },
@@ -538,7 +564,59 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: '#118B50',
     fontFamily: 'Inter-Regular',
-  }
+  },
+
+  successModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  successModalContent: {
+    width: '80%',
+    padding: 20,
+    borderRadius: 15,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  successIcon: {
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FBF6E9',
+    marginBottom: 10,
+    fontFamily: 'Inter-Regular',
+  },
+  successMessage: {
+    fontSize: 16,
+    color: '#FBF6E9',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Inter-Regular',
+  },
+  successButton: {
+    backgroundColor: '#FBF6E9',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  successButtonText: {
+    color: '#5DB996',
+    fontSize: 16,
+    fontWeight: 'bold',
+    fontFamily: 'Inter-Regular',
+  },
  
 });
 
