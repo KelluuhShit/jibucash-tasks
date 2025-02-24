@@ -1,12 +1,54 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl, ActivityIndicator,Animated, Easing } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { db } from '../services/firebase';
 import { getInitialTasks, getPersonalQuizzesTasks, getHealthWellnessTasks, getGeneralKnowledgeTasks, getMoneySavingsTasks } from '../data/tasks'; // Updated imports
 import fetchQuizDataFromFirestore from '../data/quizData';
 import CircularProgress from 'react-native-circular-progress-indicator';
+
+const SkeletonTaskCard = () => {
+  const shineAnim = useRef(new Animated.Value(-1)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.timing(shineAnim, {
+        toValue: 1, // Move to right
+        duration: 1500,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [shineAnim]);
+
+  const translateX = shineAnim.interpolate({
+    inputRange: [-1, 1],
+    outputRange: [-200, 200], // Adjust based on skeleton width
+  });
+
+  return (
+    <View style={styles.skeletonContainer}>
+      <View style={styles.skeletonTitle} />
+      <View style={styles.skeletonDescription} />
+      <View style={styles.skeletonFooter}>
+        <View style={styles.skeletonAmount} />
+        <View style={styles.skeletonButton} />
+      </View>
+      <Animated.View style={[styles.shineOverlay, { transform: [{ translateX }] }]}>
+        <LinearGradient
+          colors={['rgba(255, 255, 255, 0)', 'rgba(255, 255, 255, 0.5)', 'rgba(255, 255, 255, 0)']}
+          style={styles.gradientShine}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        />
+      </Animated.View>
+    </View>
+  );
+};
 
 const initializeTasksWithTimeLeft = (tasks) => {
   if (!Array.isArray(tasks)) {
@@ -20,8 +62,8 @@ const initializeTasksWithTimeLeft = (tasks) => {
 };
 
 const HomeScreen = ({ navigation }) => {
-  const [tasks, setTasks] = useState([]); // Initialize as empty array
-  const [standardTasks, setStandardTasks] = useState([]); // Initialize as empty array
+  const [tasks, setTasks] = useState([]);
+  const [standardTasks, setStandardTasks] = useState([]);
   const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
   const [subscription, setSubscription] = useState('Basic');
@@ -44,10 +86,12 @@ const HomeScreen = ({ navigation }) => {
   const [lastResetDate, setLastResetDate] = useState(null);
   const [completedTaskIds, setCompletedTaskIds] = useState([]);
   const [quizData, setQuizData] = useState([]);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
 
-  // Fetch tasks from Firestore on mount
+
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoadingTasks(true);
       try {
         const initial = await getInitialTasks();
         console.log('Initial Tasks:', initial);
@@ -66,17 +110,18 @@ const HomeScreen = ({ navigation }) => {
         ].sort(() => Math.random() - 0.5).map((task, index) => ({ ...task, id: `${task.category}-${index}` }));
         setStandardTasks(shuffledStandardTasks);
 
-        const quizzes = await fetchQuizDataFromFirestore(); // Fetch quiz data
+        const quizzes = await fetchQuizDataFromFirestore();
         console.log('Quiz Data:', quizzes);
-        setQuizData(quizzes); // Set quiz data state
+        setQuizData(quizzes);
       } catch (error) {
         console.error('Error fetching data:', error);
         setTasks([]);
         setStandardTasks([]);
         setQuizData([]);
+      } finally {
+        setIsLoadingTasks(false);
       }
     };
-
     fetchData();
   }, []);
 
@@ -198,13 +243,17 @@ const HomeScreen = ({ navigation }) => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTasks(prevTasks => prevTasks.map(task => {
-        if (!completedTaskIds.includes(task.id)) {
-          const timeLeft = task.expiry - Date.now();
-          return { ...task, timeLeft: Math.max(0, timeLeft) };
-        }
-        return task;
-      }));
+      setTasks(prevTasks => {
+        const updatedTasks = prevTasks.map(task => {
+          if (!completedTaskIds.includes(task.id) && task.timeLeft > 0) {
+            const timeLeft = Math.max(0, task.expiry - Date.now());
+            console.log(`Task ${task.id} timeLeft: ${timeLeft}`); // Debug log
+            return { ...task, timeLeft };
+          }
+          return task;
+        });
+        return [...updatedTasks]; // New array reference to force re-render
+      });
     }, 1000);
     return () => clearInterval(interval);
   }, [completedTaskIds]);
@@ -261,16 +310,13 @@ const HomeScreen = ({ navigation }) => {
   const renderItem = ({ item }) => {
     const isInitialTask = item.category === 'initial';
     const isCompleted = completedTaskIds.includes(item.id);
-    let hours = 0, minutes = 0, seconds = 0;
-    if (!isCompleted && item.timeLeft !== undefined) {
-      hours = Math.floor(item.timeLeft / (1000 * 60 * 60));
-      minutes = Math.floor((item.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-      seconds = Math.floor((item.timeLeft % (1000 * 60)) / 1000);
-    }
-
-    const filteredQuizData = quizData.filter(item => item.category === modalMessage);
-    const questions = filteredQuizData.length > 0 ? filteredQuizData[0].questions : [];
-
+  
+    // Calculate time components directly from timeLeft
+    const timeLeft = item.timeLeft || 0;
+    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+  
     return (
       <View style={styles.taskContainer}>
         <Text style={styles.taskTitle}>{item.title}</Text>
@@ -521,48 +567,63 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.taskItems}>
           <Text style={styles.subtitle}>Your Tasks [3]</Text>
         </View>
-        <FlatList
-          data={tasks}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.taskList}
-        />
+        {isLoadingTasks ? (
+          <View>
+            <SkeletonTaskCard />
+            <SkeletonTaskCard />
+            <SkeletonTaskCard />
+          </View>
+        ) : (
+          <FlatList
+            data={tasks}
+            renderItem={renderItem}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.taskList}
+          />
+        )}
         <Text style={styles.title}>Standard Tasks</Text>
-        <FlatList
-          data={standardTasks}
-          renderItem={({ item }) => {
-            const isInitialTask = item.category === 'initial';
-            return (
-              <View style={styles.taskContainer}>
-                <Text style={styles.taskTitle}>{item.title}</Text>
-                {!isInitialTask && (
-                  <View style={styles.premiumContainer}>
-                    <Icon name="diamond" size={20} color="orange" />
-                    <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
-                  </View>
-                )}
-                <Text style={styles.taskDescription}>{item.description}</Text>
-                <View style={styles.taskFooter}>
-                  <View style={styles.amountContainer}>
-                    <Icon name="cash" size={20} color="orange" />
-                    <Text style={styles.amountText}>KSH {item.amount}</Text>
-                  </View>
-                  {isInitialTask ? (
-                    <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
-                      <Text style={styles.startButtonText}>Start Task</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
-                      <Text style={styles.subscribeButtonText}>Start Task</Text>
-                    </TouchableOpacity>
+        {isLoadingTasks ? (
+          <View>
+            <SkeletonTaskCard />
+            <SkeletonTaskCard />
+          </View>
+        ) : (
+          <FlatList
+            data={standardTasks}
+            renderItem={({ item }) => {
+              const isInitialTask = item.category === 'initial';
+              return (
+                <View style={styles.taskContainer}>
+                  <Text style={styles.taskTitle}>{item.title}</Text>
+                  {!isInitialTask && (
+                    <View style={styles.premiumContainer}>
+                      <Icon name="diamond" size={20} color="orange" />
+                      <Text style={styles.premiumText}>STANDARD USERS ONLY</Text>
+                    </View>
                   )}
+                  <Text style={styles.taskDescription}>{item.description}</Text>
+                  <View style={styles.taskFooter}>
+                    <View style={styles.amountContainer}>
+                      <Icon name="cash" size={20} color="orange" />
+                      <Text style={styles.amountText}>KSH {item.amount}</Text>
+                    </View>
+                    {isInitialTask ? (
+                      <TouchableOpacity style={styles.startButton} onPress={() => handleStartTask(item, isInitialTask)}>
+                        <Text style={styles.startButtonText}>Start Task</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity style={styles.subscribeButton} onPress={() => setSubscriptionModalVisible(true)}>
+                        <Text style={styles.subscribeButtonText}>Start Task</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
-              </View>
-            );
-          }}
-          keyExtractor={(item, index) => `${item.category}-${index}`}
-          contentContainerStyle={styles.taskList}
-        />
+              );
+            }}
+            keyExtractor={(item, index) => `${item.category}-${index}`}
+            contentContainerStyle={styles.taskList}
+          />
+        )}
       </View>
       <Modal
         animationType="slide"
@@ -626,7 +687,7 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.subscriptionModalText}>
               Hello! {username} 👋 {"\n"}
               You're on Basic Mode and missing out on daily tasks with higher rewards! {"\n"}
-              Upgrade to Standard for just KSH 350 or explore Premium and Elite for even more earnings!
+              Upgrade to Standard for just KSH 150 or explore Premium and Elite for even more earnings!
             </Text>
             <Text style={styles.subscriptionModalSubText}>Upgrade now and start earning more!</Text>
             <TouchableOpacity style={styles.subscribeButton} onPress={navigateToDiscover}>
@@ -1244,6 +1305,54 @@ const styles = StyleSheet.create({
     width: '100%',
     textAlign: 'center',
     fontFamily: 'Inter-Regular',
+  },
+  skeletonContainer: {
+    backgroundColor: '#E0E0E0',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    overflow: 'hidden', // Ensures gradient stays within bounds
+    position: 'relative',
+  },
+  skeletonTitle: {
+    width: '60%',
+    height: 20,
+    backgroundColor: '#D0D0D0',
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  skeletonDescription: {
+    width: '90%',
+    height: 15,
+    backgroundColor: '#D0D0D0',
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  skeletonFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  skeletonAmount: {
+    width: 80,
+    height: 20,
+    backgroundColor: '#D0D0D0',
+    borderRadius: 5,
+  },
+  skeletonButton: {
+    width: 100,
+    height: 30,
+    backgroundColor: '#D0D0D0',
+    borderRadius: 5,
+  },
+  shineOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 100, // Width of the shining effect
+  },
+  gradientShine: {
+    width: '100%',
+    height: '100%',
   },
 });
 
