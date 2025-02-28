@@ -87,6 +87,13 @@ const HomeScreen = ({ navigation }) => {
   const [completedTaskIds, setCompletedTaskIds] = useState([]);
   const [quizData, setQuizData] = useState([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
+  const [topicLoading, setTopicLoading] = useState({
+    available: false,
+    personal: false,
+    health: false,
+    general: false,
+    money: false,
+  });
 
 
   useEffect(() => {
@@ -163,22 +170,39 @@ const HomeScreen = ({ navigation }) => {
     fetchUsername();
   }, []);
 
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      try {
-        const storedSubscription = await AsyncStorage.getItem('subscription');
-        if (storedSubscription) {
-          setSubscription(storedSubscription);
-        } else {
-          await AsyncStorage.setItem('subscription', 'Basic');
+  useFocusEffect(
+    useCallback(() => {
+      const fetchSubscription = async () => {
+        try {
+          const storedSubscription = await AsyncStorage.getItem('subscription');
+          setSubscription(storedSubscription || 'Basic');
+          console.log('Subscription fetched on focus:', storedSubscription || 'Basic');
+        } catch (error) {
+          console.error('Error fetching subscription:', error);
           setSubscription('Basic');
         }
-      } catch (error) {
-        console.error('Error fetching subscription: ', error);
-      }
-    };
-    fetchSubscription();
-  }, []);
+      };
+      fetchSubscription();
+    }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const updateSubscription = async () => {
+        try {
+          const storedSubscription = await AsyncStorage.getItem('subscription');
+          if (storedSubscription) {
+            setSubscription(storedSubscription);
+          }
+        } catch (error) {
+          console.error('Error updating subscription on focus:', error);
+        }
+      };
+      updateSubscription();
+    }, [])
+  );
+
+
 
   useEffect(() => {
     const loadBalance = async () => {
@@ -247,7 +271,6 @@ const HomeScreen = ({ navigation }) => {
         const updatedTasks = prevTasks.map(task => {
           if (!completedTaskIds.includes(task.id) && task.timeLeft > 0) {
             const timeLeft = Math.max(0, task.expiry - Date.now());
-            console.log(`Task ${task.id} timeLeft: ${timeLeft}`); // Debug log
             return { ...task, timeLeft };
           }
           return task;

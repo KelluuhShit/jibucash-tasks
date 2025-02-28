@@ -3,11 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Easing,
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { db } from '../services/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
-const DiscoverScreen = () => {
+const DiscoverScreen = ({ navigation }) => {
   const shineAnim = new Animated.Value(0);
   const shakeAnim = new Animated.Value(0);
   const [username, setUsername] = useState('');
+  const [subscription, setSubscription] = useState('Basic'); // New state to track subscription
   const [modalVisible, setModalVisible] = useState(false);
   const [manualModalVisible, setManualModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
@@ -18,15 +21,20 @@ const DiscoverScreen = () => {
   const [mpesaErrorMessage, setMpesaErrorMessage] = useState('');
 
   useEffect(() => {
-    const fetchUsername = async () => {
+    const fetchUserData = async () => {
       try {
         const storedUsername = await AsyncStorage.getItem('username');
         setUsername(storedUsername || 'User');
+        const storedSubscription = await AsyncStorage.getItem('subscription');
+        setSubscription(storedSubscription || 'Basic');
+        console.log('Current subscription:', storedSubscription || 'Basic');
       } catch (error) {
-        console.error('Error fetching username: ', error);
+        console.error('Error fetching user data: ', error);
+        setUsername('Guest');
+        setSubscription('Basic');
       }
     };
-    fetchUsername();
+    fetchUserData();
   }, []);
 
   const startShineAnimation = () => {
@@ -93,6 +101,7 @@ const DiscoverScreen = () => {
   const renderCard = (level, title, description, offers, price, iconName, subButton) => {
     const { borderColor, shadowColor, gradientColors } = getCardStyle(level);
     const offersArray = offers.split('✔️').filter(offer => offer.trim() !== '');
+    const isSubscribed = subscription === title; // Check if this plan is the current subscription
 
     return (
       <TouchableOpacity
@@ -107,12 +116,7 @@ const DiscoverScreen = () => {
           end={{ x: 1, y: 1 }}
         >
           <Animated.View
-            style={[
-              styles.shineOverlay,
-              {
-                transform: [{ translateX: shineInterpolation }],
-              },
-            ]}
+            style={[styles.shineOverlay, { transform: [{ translateX: shineInterpolation }] }]}
           />
         </LinearGradient>
         <View style={styles.cardHeader}>
@@ -130,15 +134,17 @@ const DiscoverScreen = () => {
         </View>
         {level !== 'Basic' && (
           <TouchableOpacity
-            style={styles.subButton}
+            style={[styles.subButton, isSubscribed && styles.subscribedButton]} // Change style if subscribed
             onPress={() => {
-              // Remove "KSH " prefix and convert price to a number
-              const priceValue = parseFloat(price.replace('KSH ', ''));
-              setModalContent({ title, description, offersArray, price: priceValue, iconName });
-              setModalVisible(true);
+              if (!isSubscribed) { // Only allow action if not subscribed
+                const priceValue = parseFloat(price.replace('KSH ', ''));
+                setModalContent({ title, description, offersArray, price: priceValue, iconName });
+                setModalVisible(true);
+              }
             }}
+            disabled={isSubscribed} // Disable button if subscribed
           >
-            <Text style={styles.subButtonText}>{subButton}</Text>
+            <Text style={styles.subButtonText}>{isSubscribed ? 'Subscribed' : subButton}</Text>
           </TouchableOpacity>
         )}
       </TouchableOpacity>
@@ -154,9 +160,7 @@ const DiscoverScreen = () => {
         Alert.alert(
           'Error',
           'Error initiating payment',
-          [
-            { text: 'Proceed Manually', onPress: () => setManualModalVisible(true) },
-          ],
+          [{ text: 'Proceed Manually', onPress: () => setManualModalVisible(true) }],
           { cancelable: false }
         );
         setErrorMessage('');
@@ -164,10 +168,12 @@ const DiscoverScreen = () => {
     }
   };
 
-  const validateMpesaMessage = () => {
-    // Convert price to an integer
+  const validateMpesaMessage = async () => {
     const priceInteger = parseInt(modalContent.price, 10);
-    // Format as integer or with .00 (e.g., "350" or "350.00")
+    if (!modalContent.price || isNaN(priceInteger)) {
+      setMpesaErrorMessage('Invalid price value');
+      return;
+    }
     const priceString = Number.isInteger(Number(modalContent.price)) ? priceInteger.toString() : `${priceInteger}.00`;
 
     if (!mpesaMessage) {
@@ -175,28 +181,57 @@ const DiscoverScreen = () => {
     } else if (!mpesaMessage.includes(priceString) || !mpesaMessage.includes('paid to FANAKA SOLUTIONS')) {
       setMpesaErrorMessage('Please make the payment and try again');
     } else {
-      setMpesaErrorMessage('');
-      setSuccessModalVisible(true); // Show success modal instead of Alert
-      setManualModalVisible(false);
-      setModalVisible(false);
+      try {
+        const paymentData = {
+          username,
+          amount: priceInteger,
+          timestamp: Date.now(),
+          mpesaMessage,
+          phoneNumber,
+          subscriptionPlan: modalContent.title,
+        };
+        await addDoc(collection(db, 'payments'), paymentData);
+        console.log('Payment saved to Firestore:', paymentData);
+
+        // Update AsyncStorage with the new subscription
+        await AsyncStorage.setItem('subscription', modalContent.title);
+        console.log('Subscription updated in AsyncStorage:', modalContent.title);
+
+        setMpesaErrorMessage('');
+        setSuccessModalVisible(true);
+        setManualModalVisible(false);
+        setModalVisible(false);
+
+        // Navigate back to HomeScreen
+        navigation.navigate('Home');
+      } catch (error) {
+        console.error('Error saving payment or subscription:', error);
+        setMpesaErrorMessage('Failed to save payment. Please try again.');
+      }
     }
   };
 
   const closeSuccessModal = () => {
     setSuccessModalVisible(false);
+    // Update subscription state when closing success modal
+    AsyncStorage.getItem('subscription').then(storedSubscription => {
+      setSubscription(storedSubscription || 'Basic');
+    }).catch(error => {
+      console.error('Error fetching subscription on modal close:', error);
+    });
   };
 
   return (
     <View style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.cardContainer}>
-        <Text style={styles.greetings}>Hello {username}, you're currently on the Basic plan.</Text>
+        <Text style={styles.greetings}>Hello {username}, you're currently on the {subscription} plan.</Text>
         <Text style={styles.subtitle}>Unlock more features and rewards by upgrading today!</Text>
         <Text style={styles.callToAction}>Join thousands of happy users who've upgraded to Standard, Premium, or Elite!</Text>
 
         {renderCard('Basic', 'Basic', 'Enjoy basic features with limited access.', '✔️ Free Daily Three Tasks. ✔️ Earn Upto KSH 10 Daily. ✔️ Tasks Expires After 24 Hours. ✔️ No Instant Withdrawals . ', 'Free', 'checkmark-circle', 'Subscribed')}
         {renderCard('Standard', 'Standard', 'Unlock more features and higher rewards.', '✔️ Enjoy Upto Fifteen Daily Tasks. ✔️ Earn Upto KSH 3,000 Daily. ✔️ Earn KSH 99 Per Video Watched. ✔️ Withdraw Earnings Instantly.', 'KSH 150', 'star-half', 'Subscribe Now')}
         {renderCard('Premium', 'Premium', 'Get premium features and even higher rewards.', '✔️ Enjoy Infinite Tasks. ✔️ Earn Upto KSH 5,000 Daily. ✔️ Refer a New User and Earn KSH 500. ✔️ Earn KSH 200 Per CAPTCHA Solved. ✔️ Withdraw Earnings Instantly.', 'KSH 200', 'star', 'Subscribe Now')}
-        {renderCard('Elite', 'Elite', 'Access all features with the highest rewards.', '✔️ Perfom Virtual Assistant Tasks. ✔️ Earn KSH 999 Per Transcription Task. ✔️ Receive Support and Training. ✔️ Get Paid To Train New Users. ✔️ Create Team and Earn Commission.', 'KSH 250', 'trophy', 'Subscribe Now')}
+        {renderCard('Elite', 'Elite', 'Access all features with the highest rewards.', '✔️ Perform Virtual Assistant Tasks. ✔️ Earn KSH 999 Per Transcription Task. ✔️ Receive Support and Training. ✔️ Get Paid To Train New Users. ✔️ Create Team and Earn Commission.', 'KSH 250', 'trophy', 'Subscribe Now')}
       </ScrollView>
 
       <Modal
@@ -226,17 +261,14 @@ const DiscoverScreen = () => {
                 style={styles.phoneInput}
                 placeholder="Enter phone number"
                 value={phoneNumber}
-                onChangeText={setPhoneNumber}
+                onChangeText={text => setPhoneNumber(text.replace(/[^0-9]/g, ''))}
                 keyboardType="phone-pad"
               />
               {errorMessage ? <Text style={[styles.errorText, errorMessage === 'Processing...' && styles.processingText]}>{errorMessage}</Text> : null}
               <TouchableOpacity style={styles.initiateButton} onPress={validatePhoneNumber}>
                 <Text style={styles.initButtonText}>Initiate Payment</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setModalVisible(false)}
-              >
+              <TouchableOpacity style={styles.closeButton} onPress={() => setModalVisible(false)}>
                 <Text style={styles.closeButtonText}>Close</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -262,17 +294,13 @@ const DiscoverScreen = () => {
                 placeholder="Paste your MPESA message here..."
                 value={mpesaMessage}
                 onChangeText={setMpesaMessage}
-                multiline={true}
-                scrollEnabled={false}
+                multiline
               />
               {mpesaErrorMessage ? <Text style={styles.errorText}>{mpesaErrorMessage}</Text> : null}
               <TouchableOpacity style={styles.initiateButton} onPress={validateMpesaMessage}>
                 <Text style={styles.initButtonText}>Confirm Payment</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setManualModalVisible(false)}
-              >
+              <TouchableOpacity style={styles.closeButton} onPress={() => setManualModalVisible(false)}>
                 <Text style={styles.closeButtonText}>Close</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -409,6 +437,9 @@ const styles = StyleSheet.create({
     borderColor: 'orange',
     borderRadius: 2,
     backgroundColor: 'white',
+  },
+  subscribedButton: {
+    backgroundColor: '#A9A9A9', // Grey out when subscribed
   },
   subButton: {
     backgroundColor: '#5DB996',
