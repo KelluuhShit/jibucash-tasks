@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Jibu Cash Tasks To Mpesa",
-    "slug": "Jibu Cash Tasks To Mpesa",
+    "slug": "jibu-cash-tasks-to-mpesa",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,6 +23,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "04822b20-1b74-413e-b8e6-c67c5ecc256b"
+      }
+    },
+    "owner": "kipngetich123"
   }
 }
