@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '../services/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { CommonActions } from '@react-navigation/native';
+import NetInfo from '@react-native-community/netinfo'; // Import NetInfo
 
 const SignInScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -14,18 +15,45 @@ const SignInScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [showSuccessGif, setShowSuccessGif] = useState(false);
+  const [isOnline, setIsOnline] = useState(true); // New state for connectivity
+
+  useEffect(() => {
+    // Monitor network connectivity
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected);
+      if (!state.isConnected) {
+        Alert.alert(
+          'No Internet Connection',
+          'Please turn on your internet to sign in.',
+          [{ text: 'OK', onPress: () => console.log('User acknowledged offline status') }]
+        );
+      }
+    });
+
+    // Initial fetch of connectivity
+    NetInfo.fetch().then(state => {
+      setIsOnline(state.isConnected);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const fetchUsername = async () => {
+      if (!isOnline) return; // Skip fetch if offline
       if (validateEmail(email)) {
         const q = query(collection(db, 'users'), where('email', '==', email));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const userDoc = querySnapshot.docs[0].data();
-          setUsername(userDoc.username);
-          await AsyncStorage.setItem('username', userDoc.username);
-        } else {
-          setUsername('');
+        try {
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const userDoc = querySnapshot.docs[0].data();
+            setUsername(userDoc.username);
+            await AsyncStorage.setItem('username', userDoc.username);
+          } else {
+            setUsername('');
+          }
+        } catch (error) {
+          console.error('Error fetching username:', error);
         }
       } else {
         setUsername('');
@@ -33,7 +61,7 @@ const SignInScreen = ({ navigation }) => {
     };
 
     fetchUsername();
-  }, [email]);
+  }, [email, isOnline]);
 
   const validateEmail = (email) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,6 +69,11 @@ const SignInScreen = ({ navigation }) => {
   };
 
   const handleSignIn = async () => {
+    if (!isOnline) {
+      Alert.alert('Offline', 'Please turn on your internet to sign in.');
+      return;
+    }
+
     let valid = true;
     let errors = {};
 
@@ -77,7 +110,7 @@ const SignInScreen = ({ navigation }) => {
                 routes: [{ name: 'HomeScreen' }],
               })
             );
-          }, 2500); // Display the GIF for 2 seconds
+          }, 2500);
         } else {
           Alert.alert('Error', 'Invalid email or password');
         }
@@ -90,50 +123,65 @@ const SignInScreen = ({ navigation }) => {
 
   return (
     <ScrollView style={styles.home}>
-    <View style={styles.container}>
-      <Image source={require('../assets/images/welcomeback.png')} style={styles.image} />
-      <Text style={styles.title}>Welcome back to JibuCash Tasks {username}</Text>
-      <Text style={styles.content}>Continue doing tasks and get paid instantly. Please sign in to continue.</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-      />
-      {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-      <View style={styles.passwordContainer}>
-        <TextInput
-          style={styles.passwordInput}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!showPassword}
-        />
-        <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
-          <Icon name={showPassword ? "eye-off" : "eye"} size={20} color="#118B50" />
-        </TouchableOpacity>
-      </View>
-      {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-      <TouchableOpacity style={styles.button} onPress={handleSignIn}>
-        {loading ? (
-          <ActivityIndicator size="small" color="#FBF6E9" />
-        ) : (
-          <Text style={styles.buttonText}>Sign In</Text>
+      <View style={styles.container}>
+        {!isOnline && (
+          <View style={styles.offlineBanner}>
+            <Image
+              source={require('../assets/images/offline.png')} // Adjust path as needed
+              style={styles.offlineImage}
+            />
+            <Text style={styles.offlineText}>You are offline. Please turn on your internet.</Text>
+          </View>
         )}
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('SignUpScreen')}>
-        <Text style={styles.signUpText}>Don't have an account? Sign Up</Text>
-      </TouchableOpacity>
-      <Modal visible={showSuccessGif} transparent={true} animationType="fade">
-        <View style={styles.animationContainer}>
-          <Image
-            source={require('../assets/images/successSignin.gif')}
-            style={styles.gif}
+        <Image source={require('../assets/images/welcomeback.png')} style={styles.image} />
+        <Text style={styles.title}>Welcome back to JibuCash Tasks {username}</Text>
+        <Text style={styles.content}>Continue doing tasks and get paid instantly. Please sign in to continue.</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          editable={isOnline} // Disable input when offline
+        />
+        {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            editable={isOnline} // Disable input when offline
           />
+          <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)} disabled={!isOnline}>
+            <Icon name={showPassword ? "eye-off" : "eye"} size={20} color={isOnline ? "#118B50" : "#A9A9A9"} />
+          </TouchableOpacity>
         </View>
-      </Modal>
-    </View>
+        {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+        <TouchableOpacity
+          style={[styles.button, !isOnline && styles.disabledButton]}
+          onPress={handleSignIn}
+          disabled={!isOnline}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#FBF6E9" />
+          ) : (
+            <Text style={styles.buttonText}>Sign In</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('SignUpScreen')} disabled={!isOnline}>
+          <Text style={[styles.signUpText, !isOnline && styles.disabledText]}>Don't have an account? Sign Up</Text>
+        </TouchableOpacity>
+        <Modal visible={showSuccessGif} transparent={true} animationType="fade">
+          <View style={styles.animationContainer}>
+            <Image
+              source={require('../assets/images/successSignin.gif')}
+              style={styles.gif}
+            />
+          </View>
+        </Modal>
+      </View>
     </ScrollView>
   );
 };
@@ -233,6 +281,23 @@ const styles = StyleSheet.create({
   gif: {
     width: 200,
     height: 200,
+  },
+  offlineBanner: {
+    backgroundColor: '#FF6347',
+    padding: 5,
+    flexDirection: 'row', // Align image and text horizontally
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offlineImage: {
+    width: 50, // Adjust size as needed
+    height: 50,
+    marginRight: 5, // Space between image and text
+  },
+  offlineText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
   },
 });
 

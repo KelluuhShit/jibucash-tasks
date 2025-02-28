@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl, ActivityIndicator,Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, Modal, ScrollView, RefreshControl, ActivityIndicator,Animated, Easing, Alert } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import NetInfo from '@react-native-community/netinfo';
 import { db } from '../services/firebase';
 import { getInitialTasks, getPersonalQuizzesTasks, getHealthWellnessTasks, getGeneralKnowledgeTasks, getMoneySavingsTasks } from '../data/tasks'; // Updated imports
 import fetchQuizDataFromFirestore from '../data/quizData';
@@ -87,6 +88,7 @@ const HomeScreen = ({ navigation }) => {
   const [completedTaskIds, setCompletedTaskIds] = useState([]);
   const [quizData, setQuizData] = useState([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
+  const [isOnline, setIsOnline] = useState(true);
   const [topicLoading, setTopicLoading] = useState({
     available: false,
     personal: false,
@@ -95,9 +97,31 @@ const HomeScreen = ({ navigation }) => {
     money: false,
   });
 
+  useEffect(() => {
+    // Subscribe to network state updates
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected);
+      if (!state.isConnected) {
+        Alert.alert(
+          'No Internet Connection',
+          'Please turn on your internet to use this app fully.',
+          [{ text: 'OK', onPress: () => console.log('User acknowledged offline status') }]
+        );
+      }
+    });
+
+    // Initial fetch of connectivity
+    NetInfo.fetch().then(state => {
+      setIsOnline(state.isConnected);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!isOnline) return; // Skip fetch if offline
       setIsLoadingTasks(true);
       try {
         const initial = await getInitialTasks();
@@ -130,7 +154,7 @@ const HomeScreen = ({ navigation }) => {
       }
     };
     fetchData();
-  }, []);
+  }, [isOnline]);
 
   useEffect(() => {
     const generateUserId = () => {
@@ -333,8 +357,6 @@ const HomeScreen = ({ navigation }) => {
   const renderItem = ({ item }) => {
     const isInitialTask = item.category === 'initial';
     const isCompleted = completedTaskIds.includes(item.id);
-  
-    // Calculate time components directly from timeLeft
     const timeLeft = item.timeLeft || 0;
     const hours = Math.floor(timeLeft / (1000 * 60 * 60));
     const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
@@ -360,9 +382,9 @@ const HomeScreen = ({ navigation }) => {
           )}
           {isInitialTask ? (
             <TouchableOpacity
-              style={[styles.startButton, isCompleted && styles.disabledButton]}
+              style={[styles.startButton, (isCompleted || !isOnline) && styles.disabledButton]}
               onPress={() => handleStartTask(item, isInitialTask)}
-              disabled={isCompleted}
+              disabled={isCompleted || !isOnline}
             >
               <Text style={styles.startButtonText}>
                 {isCompleted ? '✓ Completed' : 'Start Task'}
@@ -370,9 +392,9 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              style={[styles.subscribeButton, isCompleted && styles.disabledButton]}
+              style={[styles.subscribeButton, (isCompleted || !isOnline) && styles.disabledButton]}
               onPress={() => setSubscriptionModalVisible(true)}
-              disabled={isCompleted}
+              disabled={isCompleted || !isOnline}
             >
               <Text style={styles.subscribeButtonText}>
                 {isCompleted ? 'Completed' : 'Start Task'}
@@ -398,6 +420,23 @@ const HomeScreen = ({ navigation }) => {
       setModalTasks(selectedQuiz);
       setModalMessage(item.title);
       setConfirmationModalVisible(true);
+    }
+  };
+
+  const handleTopicPress = async (category, fetchFunction) => {
+    if (!isOnline) {
+      Alert.alert('Offline', 'Please turn on your internet to view tasks.');
+      return;
+    }
+    setTopicLoading(prev => ({ ...prev, [category.toLowerCase()]: true }));
+    try {
+      const fetchedTasks = await fetchFunction();
+      showModal(category, fetchedTasks);
+    } catch (error) {
+      console.error(`Error fetching ${category} tasks:`, error);
+      showModal(category, []);
+    } finally {
+      setTopicLoading(prev => ({ ...prev, [category.toLowerCase()]: false }));
     }
   };
 
@@ -541,6 +580,17 @@ const HomeScreen = ({ navigation }) => {
     <ScrollView style={styles.container} refreshControl={
       <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
     }>
+
+      {!isOnline && (
+              <View style={styles.offlineBanner}>
+                <Image
+                  source={require('../assets/images/offline.png')} // Adjust path based on your asset location
+                  style={styles.offlineImage}
+                />
+                <Text style={styles.offlineText}>You are offline. Please turn on your internet.</Text>
+              </View>
+            )}
+
       <View style={styles.header}>
         <View style={styles.infoIcon}>
           <Icon name="person-circle" size={40} color="#E3F0AF" />
@@ -1376,6 +1426,23 @@ const styles = StyleSheet.create({
   gradientShine: {
     width: '100%',
     height: '100%',
+  },
+  offlineBanner: {
+    backgroundColor: '#FF6347',
+    padding: 5,
+    flexDirection: 'row', // Align image and text horizontally
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offlineImage: {
+    width: 50, // Adjust size as needed
+    height: 50,
+    marginRight: 5, // Space between image and text
+  },
+  offlineText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
   },
 });
 
